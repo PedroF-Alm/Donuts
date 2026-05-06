@@ -1,11 +1,9 @@
 import pygame
 import sys
-from time import sleep
 from core.game import Game
 from gui.board import Board
 from gui.square import Square
-from gui.tray import Tray
-from gui.donut import Donut
+from util.tree import Node
 
 if __name__ != '__main__':
     print("main.py deve ser o arquivo principal.")
@@ -17,6 +15,20 @@ def create_board(board_size: tuple, tray_size: tuple, game: Game) -> tuple[Board
     board_rect.center = (screen_width // 2, screen_height // 2)
     board_offset = board_rect.topleft
     return (board, board_rect, board_offset)
+
+# n = Node('a')
+# n.add_child(Node('b'))
+# n.add_child(Node('c'))
+# n.add_child(Node('d'))
+# n.print_tree()
+
+# n2 = Node('e')
+# n2.add_child(Node('f'))
+# n2.add_child(Node('g'))
+# n2.add_child(Node('h'))
+
+# n.add_child(n2)
+# n.print_tree()
 
 seed = 1
 game = Game(seed=seed)
@@ -71,11 +83,11 @@ while running:
                 if last_state:
                     board, board_rect, board_offset = create_board(board_size, tray_size, game)
 
-            if game.end and event.key == pygame.K_SPACE:
-                seed += 1
-                game = Game(seed=seed)
+            # if game.end and event.key == pygame.K_SPACE:
+            #     seed += 1
+            #     game = Game(seed=seed)
 
-                board, board_rect, board_offset = create_board(board_size, tray_size, game)                
+            #     board, board_rect, board_offset = create_board(board_size, tray_size, game)                
 
     board.update()
 
