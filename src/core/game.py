@@ -1,6 +1,7 @@
 from core.slot import Slot
 from core.ring import Ring
 from core.graph import Graph
+from util.tree import Node
 import random
 import math
 import copy
@@ -10,7 +11,7 @@ class Game:
     PLAYER_ONE = 0
     PLAYER_TWO = 1
 
-    def __init__(self, seed: int) -> None:
+    def __init__(self, seed: int, xml_file_name: str = None) -> None:
         random.seed(seed)
 
         self.grid: list[Slot] = []
@@ -19,10 +20,16 @@ class Game:
         self.end = False
         self.player_rings = [15, 15]
         self.states = []
+        self.state_tree = Node(None)
+        self.state_tree_reference = self.state_tree
+
+        if xml_file_name is not None:
+            self.state_tree.load_from_xml(xml_file_name)
+            self.xml_file_name = xml_file_name
 
         for i in range(0, 36):                  
             self.grid.append(Slot(random.randint(0, 3)))
-
+        
     def get_xy(self, i: int) -> tuple[int, int]:
         if 0 <= i < 36:
             return (i % 6, i // 6)
@@ -220,7 +227,7 @@ class Game:
         
         return result
     
-    def most_donuts(self):
+    def most_donuts(self) -> int | None:
         graph = Graph()
         grid_owners = self.get_owners(self.grid)
         for i in range(0, 36):
@@ -285,21 +292,28 @@ class Game:
         self.grab_donuts(x, y)        
         self.check_winner()
 
-    def save_state(self):
-        save = [copy.deepcopy(self.grid), self.player_rings.copy(), self.turn, self.end]
-        self.states.append(save)
+    def save_state(self) -> dict:
+        state = {'grid': copy.deepcopy(self.grid), 'player_rings': self.player_rings.copy(), 'turn': self.turn, 'end': self.end, 'winner': self.winner}
+        self.states.append(state)
     
     def last_state(self) -> bool:        
         if self.states:
             state = self.states.pop()
-            self.grid         = state[0]
-            self.player_rings = state[1]
-            self.turn         = state[2]
-            self.end          = state[3]
+            
+            self.grid         = state['grid']
+            self.player_rings = state['player_rings']
+            self.turn         = state['turn']
+            self.end          = state['end']
+            self.winner       = state['winner']
+
+            self.state_tree_reference = self.state_tree_reference.parent
             
             return True
         return False
-
+    
+    def serialize_state(self) -> str:        
+        state = {'grid': copy.deepcopy(self.grid), 'player_rings': self.player_rings.copy(), 'turn': self.turn, 'end': self.end, 'winner': self.winner}
+        return f"{self.get_owners(state['grid'])}:{state['player_rings']}:{state['turn']}:{state['end']}:{state['winner']}"
 
     def place_ring(self, x: int, y: int) -> bool:        
         if not self.end and 0 <= x < 6 and 0 <= y < 6 and self.player_rings[self.turn] > 0:
@@ -312,6 +326,10 @@ class Game:
                 self.evaluate(x, y)                    
                 self.change_slots(x, y, slot_2_place.direction)                     
                 self.turn = Game.PLAYER_TWO if self.turn == Game.PLAYER_ONE else Game.PLAYER_ONE                
+                child = Node(self.serialize_state())                               
+                self.state_tree_reference = self.state_tree_reference.add_child(child)      
+                if self.xml_file_name is not None:
+                    self.state_tree.print_tree(self.xml_file_name)
                 return True
             else:
                 return False

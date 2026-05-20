@@ -1,17 +1,19 @@
 import pygame
 from core.slot import Slot
 from gui.donut import Donut
+from pathlib import Path
 
 class Square(pygame.sprite.Sprite):
     
     def __init__(self, size: tuple, id: int, mirror: Slot, pos: tuple = (0, 0)) -> None:
         super().__init__()
+        script_dir = Path(__file__).resolve().parent
 
         self.id = id
         self.pos = pos
 
         self.image = pygame.Surface(size, pygame.SRCALPHA)
-        self.background = pygame.image.load('../assets/images/bars.webp').convert_alpha()
+        self.background = pygame.image.load(f'{script_dir}/../../assets/images/bars.webp').convert_alpha()
         self.background = pygame.transform.scale(self.background, (564 / 2, 282 / 2))
 
         self.direction = mirror.direction

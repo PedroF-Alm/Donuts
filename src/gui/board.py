@@ -3,15 +3,18 @@ from gui.square import Square
 from gui.tray import Tray
 from gui.donut import Donut
 from core.game import Game
+from pathlib import Path
 
 class Board(pygame.Surface):
 
     def __init__(self, size: tuple, tray_size: tuple, game: Game, flags: int = pygame.SRCALPHA) -> None:
         super().__init__(size, flags)
-        self.game = game
+        script_dir = Path(__file__).resolve().parent
         
+        self.game = game
+
         try:
-            self.background = pygame.image.load('../assets/images/boardback.webp').convert_alpha()
+            self.background = pygame.image.load(f'{script_dir}/../../assets/images/boardback.webp').convert_alpha()
             self.background = pygame.transform.scale(self.background, size)
             self.blit(self.background, (0, 0))
         except pygame.error:
@@ -69,11 +72,10 @@ class Board(pygame.Surface):
                 self.tray2.place_donut(square)      
 
     def handle_click(self, mouse_pos: tuple, board_offset: tuple = (0, 0)) -> Square | None:
-            
-            # Ajusta a posição do mouse para o sistema de coordenadas do Board
-            adjusted_pos = (mouse_pos[0] - board_offset[0], mouse_pos[1] - board_offset[1])
+                        
+        adjusted_pos = (mouse_pos[0] - board_offset[0], mouse_pos[1] - board_offset[1])
 
-            for square in self.squares_group:
-                if square.rect.collidepoint(adjusted_pos):                                        
-                    return square
-            return None
+        for square in self.squares_group:
+            if square.rect.collidepoint(adjusted_pos):                                        
+                return square
+        return None

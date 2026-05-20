@@ -14,7 +14,7 @@ class Tray(pygame.Surface):
         for i in range(donuts_count):
             self.donuts_group.add(Donut((70, 70), owner, pos=(size[0] / 2, 28 * i + 40)))     
     
-    def draw_donuts(self):
+    def draw_donuts(self) -> None:
         self.donuts_group.draw(self)
 
     def place_donut(self, square: Square) -> None:

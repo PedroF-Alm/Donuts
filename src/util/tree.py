@@ -3,34 +3,68 @@ from xml.dom import minidom
 
 class Node():
 
-    def __init__(self, data):
+    def __init__(self, data: str):
         self.data = data
-        self.children = []  # List to store child nodes
+        self.children = []
         self.parent = None
-        self.root = ET.Element("node", id="0")
-        ET.indent(self.root, space="  ")        
+        self.xml_element = ET.Element("node", id="0")
+        self.xml_element.set('data', str(data))        
 
-    def add_child(self, child):
+    def load_from_xml(self, xml_file_name: str) -> None:
+        try:
+            tree = ET.parse(xml_file_name)
+            xml_root = tree.getroot()
+            
+            raw_data = xml_root.get('data')
+            self.data = None if raw_data == "None" else raw_data            
+            self.xml_element.set('data', str(self.data))
+            self.children = []
+            
+            for child in list(self.xml_element):
+                self.xml_element.remove(child)
+            
+            def build_tree_recursive(current_node, current_xml_element):
+                for xml_child in current_xml_element:                    
+                    child_data = xml_child.get('data')                                    
+                    new_node = Node(child_data)                                        
+                    added_node = current_node.add_child(new_node)                                        
+                    build_tree_recursive(added_node, xml_child)
+            
+            build_tree_recursive(self, xml_root)
+            
+            print(f"Success: tree loaded from {xml_file_name}")
+
+        except FileNotFoundError:
+            print(f"Error: file '{xml_file_name}' not found.")
+        except ET.ParseError:
+            print(f"Error: Malformed XML.")
+
+    def add_child(self, child):         
+        known = self.find(child.data)
+        if known:            
+            return known
+        
         child.parent = self
+        child.xml_element.set('id', str(len(self.children)))
         self.children.append(child)        
-        child_true_root = child.root
-        child_root = ET.SubElement(self.root, "node", id=str(len(self.children)))
-        for _ in child_true_root.findall('node'):
-            ET.SubElement(child_root, "node", id=str(_.get('id')))
+        self.xml_element.append(child.xml_element)
+
+        return child
     
+    def find(self, data: str):
+        if self.data == data:            
+            return self
+        
+        for c in self.children:
+            res = c.find(data) 
+            if res:
+                return res
+            
+        return None
 
-    def get_level(self):
-        """Calculates the depth of the node in the tree."""
-        level = 0
-        p = self.parent
-        while p:
-            level += 1
-            p = p.parent
-        return level
-
-    def print_tree(self):
-        """Prints the tree structure with indentation."""
-        xml_string = ET.tostring(self.root, encoding='utf-8')
+    def print_tree(self, xml_file_name: str = 'tree.xml') -> None:        
+        xml_string = ET.tostring(self.xml_element, encoding='utf-8')
         pretty_xml = minidom.parseString(xml_string).toprettyxml(indent="  ")
 
-        print(pretty_xml)
+        with open(xml_file_name, 'w', encoding="utf-8") as f:
+            f.write(pretty_xml)
