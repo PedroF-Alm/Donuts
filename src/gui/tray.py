@@ -6,7 +6,7 @@ class Tray(pygame.Surface):
 
     def __init__(self, size, owner, donuts_count = 15, flags: int = pygame.SRCALPHA):
         super().__init__(size, flags)
-        self.size = size # (Uncomment this line if OS is Linux)
+        # self.size = size # (Uncomment this line if OS is Linux)
         pygame.draw.rect(self, (255, 255, 255), (0, 0, size[0], size[1]), border_radius=50)
         self.set_alpha(120)
         self.donuts_group = pygame.sprite.Group()

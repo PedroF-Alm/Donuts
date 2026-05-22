@@ -311,25 +311,49 @@ class Game:
             return True
         return False
     
-    def serialize_state(self) -> str:        
-        state = {'grid': copy.deepcopy(self.grid), 'player_rings': self.player_rings.copy(), 'turn': self.turn, 'end': self.end, 'winner': self.winner}
-        return f"{self.get_owners(state['grid'])}:{state['player_rings']}:{state['turn']}:{state['end']}:{state['winner']}"
+    def serialize_state(self, i = None) -> str:        
+        owners = self.get_owners(self.grid)
+        if i is not None:
+            owners[i] = 2
+        return f"{owners}:{self.player_rings}:{self.turn}:{self.end}:{self.winner}"
+
+    def expand_next_states(self) -> None:              
+        for i in range(0, 36):
+            if self.grid[i].blocked or self.grid[i].ring is not None:
+                continue
+
+            doppelganger = copy.deepcopy(self)
+            slot = doppelganger.grid[i]
+            x, y = doppelganger.get_xy(i)
+            slot.ring = Ring(self.turn)                               
+            doppelganger.player_rings[self.turn] -= 1
+            doppelganger.evaluate(x, y)            
+            
+            child = Node(doppelganger.serialize_state(i))                                           
+            self.state_tree_reference.add_child(child)             
 
     def place_ring(self, x: int, y: int) -> bool:        
         if not self.end and 0 <= x < 6 and 0 <= y < 6 and self.player_rings[self.turn] > 0:
             slot_2_place: Slot = self.grid[y * 6 + x]
             if slot_2_place.ring == None and not slot_2_place.blocked:
                 self.save_state()
+
                 slot_2_place.ring = Ring(self.turn)   
                 slot_2_place.blocked = True                 
                 self.player_rings[self.turn] -= 1
                 self.evaluate(x, y)                    
-                self.change_slots(x, y, slot_2_place.direction)                     
+                self.change_slots(x, y, slot_2_place.direction)     
+
+                child = Node(self.serialize_state(self.get_me(x, y)))                               
+                self.state_tree_reference = self.state_tree_reference.add_child(child)
+                
                 self.turn = Game.PLAYER_TWO if self.turn == Game.PLAYER_ONE else Game.PLAYER_ONE                
-                child = Node(self.serialize_state())                               
-                self.state_tree_reference = self.state_tree_reference.add_child(child)      
+
+                if not self.end:            
+                    self.expand_next_states()      
                 if self.xml_file_name is not None:
                     self.state_tree.print_tree(self.xml_file_name)
+
                 return True
             else:
                 return False

@@ -13,7 +13,7 @@ def build_graph_from_xml(xml_file):
     root = tree.getroot()
     g = Graph(directed=True)
     labels = []
-    mapping = {'-1': "⬜", '0': "🟨", '1': "🟫"}
+    mapping = {'-1': "⬜", '0': "🟨", '1': "🟫", '2': "🟧"}
     def add_node(element, parent_index=None):
         current_index = g.vcount()
         g.add_vertex()
@@ -96,9 +96,9 @@ def start_plot(xml_file_name, interval):
                 if 'End: True' in label:
                     node_colors.append('#16c60c')                    
                 elif 'Turn: 0' in label:
-                    node_colors.append('#0078d7')
+                    node_colors.append('#fff100')
                 else:
-                    node_colors.append('#e81224')                
+                    node_colors.append('#8e562e')                
 
             # Plotting
             fig = go.Figure()
