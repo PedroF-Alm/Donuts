@@ -22,7 +22,7 @@ class Game:
         self.states = []
         self.state_tree = Node(None)
         self.state_tree_reference = self.state_tree
-
+        
         if xml_file_name is not None:
             self.state_tree.load_from_xml(xml_file_name)
             self.xml_file_name = xml_file_name
@@ -211,13 +211,15 @@ class Game:
         
         for i in range(0, 6):            
             horizontal = self.get_owners(self.grid[i*6:i*6+6])
-            vertical   = self.get_owners(self.grid[i::6])        
+            vertical   = self.get_owners(self.grid[i::6])    
+                
             if horizontal is not None and self.is_sublist(fives, horizontal):
                 for s in self.grid[i*6:i*6+6]:
                     if s.ring is not None and s.ring.owner == self.turn:
                         s.marked = True
                 result = True
                 horizontal = None
+
             if vertical is not None and self.is_sublist(fives, vertical):
                 for s in self.grid[i::6]:
                     if s.ring is not None and s.ring.owner == self.turn:
@@ -272,17 +274,12 @@ class Game:
             s.marked = False 
 
         if (self.get_fives()):
-            self.winner = self.turn
-            print(f"PLAYER {'ONE' if self.winner == Game.PLAYER_ONE else 'TWO'} WON!")
+            self.winner = self.turn            
             self.end = True
             return True        
         
         if self.player_rings == [0, 0]:
             self.winner = self.most_donuts()
-            if self.winner is None:
-                print("TIE!")  
-            else:              
-                print(f"PLAYER {'ONE' if self.winner == Game.PLAYER_ONE else 'TWO'} WON!")
             self.end = True
             return True
         
@@ -306,7 +303,10 @@ class Game:
             self.end          = state['end']
             self.winner       = state['winner']
 
-            self.state_tree_reference = self.state_tree_reference.parent
+            self.set_stree_reference(self.state_tree_reference.parent)            
+
+            if self.xml_file_name is not None:
+                self.state_tree.print_tree(self.xml_file_name)
             
             return True
         return False
@@ -330,11 +330,18 @@ class Game:
             doppelganger.evaluate(x, y)            
             
             child = Node(doppelganger.serialize_state(i))                                           
-            self.state_tree_reference.add_child(child)             
+            self.state_tree_reference.add_child(child)        
+
+    def set_stree_reference(self, new_reference):
+        self.state_tree_reference.remove_xml_attribute('active')
+        self.state_tree_reference = new_reference
+        self.state_tree_reference.set_xml_attribute('active', 'True')   
 
     def place_ring(self, x: int, y: int) -> bool:        
         if not self.end and 0 <= x < 6 and 0 <= y < 6 and self.player_rings[self.turn] > 0:
+
             slot_2_place: Slot = self.grid[y * 6 + x]
+
             if slot_2_place.ring == None and not slot_2_place.blocked:
                 self.save_state()
 
@@ -345,16 +352,18 @@ class Game:
                 self.change_slots(x, y, slot_2_place.direction)     
 
                 child = Node(self.serialize_state(self.get_me(x, y)))                               
-                self.state_tree_reference = self.state_tree_reference.add_child(child)
+                self.set_stree_reference(self.state_tree_reference.add_child(child))
                 
                 self.turn = Game.PLAYER_TWO if self.turn == Game.PLAYER_ONE else Game.PLAYER_ONE                
 
                 if not self.end:            
-                    self.expand_next_states()      
+                    self.expand_next_states()   
+
                 if self.xml_file_name is not None:
                     self.state_tree.print_tree(self.xml_file_name)
 
                 return True
             else:
                 return False
+            
         return False

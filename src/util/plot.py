@@ -18,10 +18,11 @@ def build_graph_from_xml(xml_file):
         current_index = g.vcount()
         g.add_vertex()
         data = element.get('data')        
+        active = element.get('active')        
         if data != 'None':
             data = data.split(':')
             grid = ''.join(f"{mapping[v]}{'<br>' if (i + 1) % 6 == 0 else ''}" for i, v in enumerate(data[0].removeprefix('[').removesuffix(']').split(', ')))            
-            data = f"Grid: <br>{grid}<br>Player Rings: {data[1]}<br>Turn: {data[2]}<br>End: {data[3]}<br>Winner: {data[4]}"
+            data = f"Grid: <br>{grid}<br>Player Rings: {data[1]}<br>Turn: {data[2]}<br>End: {data[3]}<br>Winner: {data[4]}<br>Active: {False if active is None else True}"
         labels.append(data)
         if parent_index is not None:
             g.add_edge(parent_index, current_index)
@@ -92,13 +93,23 @@ def start_plot(xml_file_name, interval):
 
             node_colors = ['#886ce4']
 
-            for label in v_label[1:]:             
-                if 'End: True' in label:
-                    node_colors.append('#16c60c')                    
-                elif 'Turn: 0' in label:
-                    node_colors.append('#fff100')
-                else:
-                    node_colors.append('#8e562e')                
+            num_nodes = len(v_label)
+            border_widths = [0] * num_nodes                    
+            border_colors = ['rgba(0,0,0,0)'] * num_nodes            
+            
+            for i in range(0, len(v_label)):             
+                label = v_label[i]
+                if i > 0:
+                    if 'End: True' in label:
+                        node_colors.append('#16c60c')                    
+                    elif 'Turn: 0' in label:
+                        node_colors.append('#fff100')
+                    else:
+                        node_colors.append('#8e562e')   
+
+                if 'Active: True' in label:
+                    border_widths[i] = 3 
+                    border_colors[i] = 'black'
 
             # Plotting
             fig = go.Figure()
@@ -106,7 +117,13 @@ def start_plot(xml_file_name, interval):
             fig.add_scattergl(x=Xn, 
                               y=Yn, 
                               mode='markers', 
-                              marker=dict(size=20, color=node_colors),
+                              marker=dict(size=20, 
+                                          color=node_colors,
+                                          line=dict(
+                                              color=border_colors,
+                                              width=border_widths
+                                          )                                          
+                                          ),
                               text=v_label, 
                               hoverinfo='text',
                               hoverlabel=dict(

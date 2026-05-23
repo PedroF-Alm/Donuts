@@ -8,7 +8,13 @@ class Node():
         self.children = []
         self.parent = None
         self.xml_element = ET.Element("node", id="0")
-        self.xml_element.set('data', str(data))        
+        self.xml_element.set('data', str(data))                
+
+    def set_xml_attribute(self, attr, value):
+        self.xml_element.set(attr, value)
+    
+    def remove_xml_attribute(self, attr):
+        self.xml_element.attrib.pop(attr, None)
 
     def load_from_xml(self, xml_file_name: str) -> None:
         try:
@@ -24,7 +30,7 @@ class Node():
                 self.xml_element.remove(child)
             
             def build_tree_recursive(current_node, current_xml_element):
-                for xml_child in current_xml_element:                    
+                for xml_child in current_xml_element:                               
                     child_data = xml_child.get('data')                                    
                     new_node = Node(child_data)                                        
                     added_node = current_node.add_child(new_node)                                        
