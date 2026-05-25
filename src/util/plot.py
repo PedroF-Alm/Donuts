@@ -22,7 +22,7 @@ def build_graph_from_xml(xml_file):
         if data != 'None':
             data = data.split(':')
             grid = ''.join(f"{mapping[v]}{'<br>' if (i + 1) % 6 == 0 else ''}" for i, v in enumerate(data[0].removeprefix('[').removesuffix(']').split(', ')))            
-            data = f"Grid: <br>{grid}<br>Player Rings: {data[1]}<br>Turn: {data[2]}<br>End: {data[3]}<br>Winner: {data[4]}<br>Active: {False if active is None else True}"
+            data = f"Grid: <br>{grid}<br>Player Rings: {data[1]}<br>Turn: {data[2]}<br>End: {data[3]}<br>Winner: {data[4]}<br>Steps: {data[5]}<br>Active: {False if active is None else True}"
         labels.append(data)
         if parent_index is not None:
             g.add_edge(parent_index, current_index)

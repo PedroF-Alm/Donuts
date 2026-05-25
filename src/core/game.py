@@ -11,24 +11,29 @@ class Game:
     PLAYER_ONE = 0
     PLAYER_TWO = 1
 
-    def __init__(self, seed: int, xml_file_name: str = None) -> None:
+    def __init__(self, seed: int, dificulty: int = 3, xml_file_name: str = None) -> None:
         random.seed(seed)
 
         self.grid: list[Slot] = []
+        self.dificulty = dificulty
         self.turn = Game.PLAYER_ONE
         self.winner = None
         self.end = False
+        self.step = 0
         self.player_rings = [15, 15]
         self.states = []
         self.state_tree = Node(None)
         self.state_tree_reference = self.state_tree
         
+        for i in range(0, 36):                  
+            self.grid.append(Slot(random.randint(0, 3)))
+
+        # print(self.calculate_best_play(dificulty))
+
         if xml_file_name is not None:
             self.state_tree.load_from_xml(xml_file_name)
             self.xml_file_name = xml_file_name
-
-        for i in range(0, 36):                  
-            self.grid.append(Slot(random.randint(0, 3)))
+            self.state_tree.print_tree(xml_file_name)
         
     def get_xy(self, i: int) -> tuple[int, int]:
         if 0 <= i < 36:
@@ -287,10 +292,10 @@ class Game:
 
     def evaluate(self, x: int, y: int) -> None:    
         self.grab_donuts(x, y)        
-        self.check_winner()
+        self.check_winner()    
 
     def save_state(self) -> dict:
-        state = {'grid': copy.deepcopy(self.grid), 'player_rings': self.player_rings.copy(), 'turn': self.turn, 'end': self.end, 'winner': self.winner}
+        state = {'grid': copy.deepcopy(self.grid), 'player_rings': self.player_rings.copy(), 'turn': self.turn, 'end': self.end, 'winner': self.winner, 'step': self.step}
         self.states.append(state)
     
     def last_state(self) -> bool:        
@@ -302,6 +307,7 @@ class Game:
             self.turn         = state['turn']
             self.end          = state['end']
             self.winner       = state['winner']
+            self.step         = state['step']
 
             self.set_stree_reference(self.state_tree_reference.parent)            
 
@@ -315,22 +321,31 @@ class Game:
         owners = self.get_owners(self.grid)
         if i is not None:
             owners[i] = 2
-        return f"{owners}:{self.player_rings}:{self.turn}:{self.end}:{self.winner}"
+        return f"{owners}:{self.player_rings}:{self.turn}:{self.end}:{self.winner}:{self.step}"
 
-    def expand_next_states(self) -> None:              
+    def expand_next_states(self) -> list[Game]:      
+        doppelgangers = []  
+
         for i in range(0, 36):
             if self.grid[i].blocked or self.grid[i].ring is not None:
                 continue
 
-            doppelganger = copy.deepcopy(self)
+            doppelganger = copy.deepcopy(self)                                                
+            doppelganger.turn = Game.PLAYER_TWO if self.turn == Game.PLAYER_ONE else Game.PLAYER_ONE            
+
             slot = doppelganger.grid[i]
-            x, y = doppelganger.get_xy(i)
-            slot.ring = Ring(self.turn)                               
-            doppelganger.player_rings[self.turn] -= 1
-            doppelganger.evaluate(x, y)            
             
-            child = Node(doppelganger.serialize_state(i))                                           
-            self.state_tree_reference.add_child(child)        
+            x, y = doppelganger.get_xy(i)
+            slot.ring = Ring(doppelganger.turn)            
+            slot.blocked = True                       
+            doppelganger.player_rings[doppelganger.turn] -= 1
+            doppelganger.evaluate(x, y)       
+            doppelganger.change_slots(x, y, slot.direction)      
+            doppelganger.step += 1        
+
+            doppelgangers.append((doppelganger, i))
+
+        return doppelgangers
 
     def set_stree_reference(self, new_reference):
         self.state_tree_reference.remove_xml_attribute('active')
@@ -352,12 +367,14 @@ class Game:
                 self.change_slots(x, y, slot_2_place.direction)     
 
                 child = Node(self.serialize_state(self.get_me(x, y)))                               
-                self.set_stree_reference(self.state_tree_reference.add_child(child))
-                
-                self.turn = Game.PLAYER_TWO if self.turn == Game.PLAYER_ONE else Game.PLAYER_ONE                
+                self.set_stree_reference(self.state_tree_reference.add_child(child))  
 
-                if not self.end:            
-                    self.expand_next_states()   
+                if not self.end:                      
+                    print(self.calculate_best_play(self.dificulty))                    
+
+                self.turn = Game.PLAYER_TWO if self.turn == Game.PLAYER_ONE else Game.PLAYER_ONE 
+
+                self.step += 1
 
                 if self.xml_file_name is not None:
                     self.state_tree.print_tree(self.xml_file_name)
@@ -367,3 +384,63 @@ class Game:
                 return False
             
         return False
+    
+
+    def minimax(self, state: Game, i: int, parent_node: Node, depth: int = -1, maximizingPlayer: bool = True):
+        current_node = Node(state.serialize_state(i))
+        if parent_node is not None:
+            parent_node.add_child(current_node)
+        
+        if depth == 0 or state.end:
+            return state.heuristic(state), [current_node]
+        
+        next_states = state.expand_next_states()
+        if not next_states:
+            return state.heuristic(state), [current_node]
+
+        best_score = -float('inf') if maximizingPlayer else float('inf')
+        best_path = []
+
+        for next_game, move_i in next_states:
+            score, path = self.minimax(next_game, move_i, current_node, depth - 1, not maximizingPlayer)
+            
+            if maximizingPlayer:
+                if score > best_score:
+                    best_score = score
+                    best_path = [current_node] + path
+            else:
+                if score < best_score:
+                    best_score = score
+                    best_path = [current_node] + path
+                    
+        return best_score, best_path
+    
+    def heuristic(self, state: Game):
+        if state.winner == Game.PLAYER_TWO:
+            return 10000
+        elif state.winner == Game.PLAYER_ONE:
+            return -10000
+        else:
+            return 0
+
+    def calculate_best_play(self, depth: int) -> int:  
+        player = self.turn  
+        best_score = -float('inf')
+        best_index = -1
+        best_nodes_path = []
+
+        next_states = self.expand_next_states()
+        
+        for next_game, i in next_states:
+            score, path = self.minimax(next_game, i, self.state_tree_reference, depth, player == Game.PLAYER_ONE)
+            
+            if score > best_score:
+                best_score = score
+                best_index = i
+                best_nodes_path = path
+
+        for node in best_nodes_path:
+            if node is not None:
+                node.set_xml_attribute('best', 'True')
+                
+        return best_index

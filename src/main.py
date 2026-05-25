@@ -2,6 +2,8 @@
 def run_game():
 
     import pygame
+    import sys
+    import os
     from core.game import Game
     from gui.board import Board
     from gui.square import Square
@@ -19,7 +21,12 @@ def run_game():
         return (board, board_rect, board_offset)
     
     seed = 1
-    game = Game(seed=seed, xml_file_name=f'{script_dir}/tree.xml')
+
+    if '-reset_tree' in sys.argv and os.path.exists(f'{script_dir}/tree.xml'):
+        os.remove(f'{script_dir}/tree.xml')
+    
+
+    game = Game(seed=seed, dificulty=3, xml_file_name=f'{script_dir}/tree.xml')
 
     pygame.init()
 
