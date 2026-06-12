@@ -17,12 +17,15 @@ def build_graph_from_xml(xml_file):
     def add_node(element, parent_index=None):
         current_index = g.vcount()
         g.add_vertex()
-        data = element.get('data')        
+        data = element.get('data')    
+        heuristic_p1 = element.get('heuristic_p1') 
+        heuristic_p2 = element.get('heuristic_p2') 
+        move = int(element.get("move"))
         active = element.get('active')        
         if data != 'None':
-            data = data.split(':')
-            grid = ''.join(f"{mapping[v]}{'<br>' if (i + 1) % 6 == 0 else ''}" for i, v in enumerate(data[0].removeprefix('[').removesuffix(']').split(', ')))            
-            data = f"Grid: <br>{grid}<br>Player Rings: {data[1]}<br>Turn: {data[2]}<br>End: {data[3]}<br>Winner: {data[4]}<br>Steps: {data[5]}<br>Active: {False if active is None else True}"
+            data = data.split(':')  
+            grid = ''.join(f"{mapping[v] if i != move else mapping['2']}{'<br>' if (i + 1) % 6 == 0 else ''}" for i, v in enumerate(data[0].removeprefix('[').removesuffix(']').split(', ')))                        
+            data = f"Grid: <br>{grid}<br>Player Rings: {data[1]}<br>Turn: {data[2]}<br>End: {data[3]}<br>Winner: {data[4]}<br>Steps: {data[5]}<br>Active: {False if active is None else True}<br>Heuristic: [{heuristic_p1}, {heuristic_p2}]"
         labels.append(data)
         if parent_index is not None:
             g.add_edge(parent_index, current_index)
@@ -152,4 +155,4 @@ def start_plot(xml_file_name, interval):
             raise dash.exceptions.PreventUpdate
 
     # Start server
-    app.run(debug=True, use_reloader=False)
+    app.run(debug=True, use_reloader=False)    

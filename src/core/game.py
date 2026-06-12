@@ -11,11 +11,10 @@ class Game:
     PLAYER_ONE = 0
     PLAYER_TWO = 1
 
-    def __init__(self, seed: int, dificulty: int = 3, xml_file_name: str = None) -> None:
+    def __init__(self, seed: int, xml_file_name: str = None) -> None:
         random.seed(seed)
 
-        self.grid: list[Slot] = []
-        self.dificulty = dificulty
+        self.grid: list[Slot] = []        
         self.turn = Game.PLAYER_ONE
         self.winner = None
         self.end = False
@@ -24,16 +23,20 @@ class Game:
         self.states = []
         self.state_tree = Node(None)
         self.state_tree_reference = self.state_tree
+                
+        self.max_component_player_one = []
+        self.max_component_player_two = []
+        self.placed_rings = [[0] * 18 for _ in range(2)] 
+        self.last_move = None
+        self.donuts_taken = 0
         
         for i in range(0, 36):                  
             self.grid.append(Slot(random.randint(0, 3)))
 
-        # print(self.calculate_best_play(dificulty))
-
         if xml_file_name is not None:
             self.state_tree.load_from_xml(xml_file_name)
-            self.xml_file_name = xml_file_name
-            self.state_tree.print_tree(xml_file_name)
+            self.xml_file_name = xml_file_name    
+            self.save_tree_xml()        
         
     def get_xy(self, i: int) -> tuple[int, int]:
         if 0 <= i < 36:
@@ -119,6 +122,8 @@ class Game:
         neighbors = self.get_neighbors(x, y)
 
         myself = self.grid[self.get_me(x, y)].ring
+
+        self.donuts_taken = 0
                         
         for directed_neighbors in neighbors:                                        
             neighborhood_clusters = []
@@ -156,11 +161,13 @@ class Game:
                 
                 edges[0].owner = self.turn
                 edges[1].owner = self.turn
-                
+
+                self.donuts_taken += 1
+    
     def is_sublist(self, sub: list, main: list):
         n = len(sub)
-        return any(sub == main[i:i + n] for i in range(len(main) - n + 1))
-    
+        return any(sub == main[i:i + n] for i in range(len(main) - n + 1)) 
+
     def get_owner(self, slt: Slot) -> int:
         if slt.ring is None:
             return -1
@@ -171,66 +178,34 @@ class Game:
         return list(map(lambda slt: self.get_owner(slt), slots))
 
     def get_fives(self) -> bool:
-        fives = [self.turn]*5
+        target = [self.turn] * 5
         result = False
+        
+        lines = []
 
-        second_diagonal_middle = self.get_owners(self.grid[5::5])
-        second_diagonal_top    = self.get_owners(self.grid[4::5])
-        second_diagonal_bottom = self.get_owners(self.grid[11::5])
+        for i in range(6):
+            lines.append(self.grid[i*6 : i*6+6]) 
+            lines.append(self.grid[i :: 6])      
+        
+        lines.append(self.grid[5:31:5]) 
+        lines.append(self.grid[4:25:5]) 
+        lines.append(self.grid[11:32:5])
+        lines.append(self.grid[0:35:7]) 
+        lines.append(self.grid[1:30:7]) 
+        lines.append(self.grid[6:35:7])         
+        
+        self.placed_rings = [[0] * len(lines) for _ in range(2)] 
 
-        first_diagonal_middle  = self.get_owners(self.grid[0::7])
-        first_diagonal_top     = self.get_owners(self.grid[1::7])
-        first_diagonal_bottom  = self.get_owners(self.grid[6::7])
-
-        if self.is_sublist(fives, second_diagonal_middle):  
-            for s in self.grid[5::5]:
-                if s.ring is not None and s.ring.owner == self.turn:
-                    s.marked = True   
-            result = True         
-        
-        if fives == second_diagonal_top:
-            for s in self.grid[4::5]:
-                s.marked = True            
-            result = True
-        
-        if fives == second_diagonal_bottom:
-            for s in self.grid[11::5]:
-                s.marked = True            
-            result = True
-        
-        if self.is_sublist(fives, first_diagonal_middle):  
-            for s in self.grid[0::7]:
-                if s.ring is not None and s.ring.owner == self.turn:
-                    s.marked = True            
-            result = True
-        
-        if fives == first_diagonal_top:
-            for s in self.grid[1::7]:
-                s.marked = True
-            result = True
-        
-        if fives == first_diagonal_bottom:
-            for s in self.grid[6::7]:
-                s.marked = True
-            result = True        
-        
-        for i in range(0, 6):            
-            horizontal = self.get_owners(self.grid[i*6:i*6+6])
-            vertical   = self.get_owners(self.grid[i::6])    
-                
-            if horizontal is not None and self.is_sublist(fives, horizontal):
-                for s in self.grid[i*6:i*6+6]:
-                    if s.ring is not None and s.ring.owner == self.turn:
+        for i in range(len(lines)):
+            owners = self.get_owners(lines[i])            
+            for o in owners:
+                if o == Game.PLAYER_ONE or o == Game.PLAYER_TWO:
+                    self.placed_rings[o][i] += 1            
+            if self.is_sublist(target, owners): 
+                for s in lines[i]:
+                    if s.ring and s.ring.owner == self.turn:
                         s.marked = True
-                result = True
-                horizontal = None
-
-            if vertical is not None and self.is_sublist(fives, vertical):
-                for s in self.grid[i::6]:
-                    if s.ring is not None and s.ring.owner == self.turn:
-                        s.marked = True
-                result = True    
-                vertical = None        
+                result = True                
         
         return result
     
@@ -251,28 +226,27 @@ class Game:
             if bottom < 36 and grid_owners[bottom] == grid_owners[i]:
                 graph.addEdge(i, bottom)
         
-        max_component_player_one = []
-        max_component_player_two = []
+        self.max_component_player_one = []
+        self.max_component_player_two = []
 
         for c in graph.getComponents():              
             r = self.grid[c[0]].ring
             if r is not None:
-                if r.owner == self.PLAYER_ONE and len(c) > len(max_component_player_one):
-                    max_component_player_one = c
-                elif r.owner == self.PLAYER_TWO and len(c) > len(max_component_player_two):
-                    max_component_player_two = c
+                if r.owner == self.PLAYER_ONE and len(c) > len(self.max_component_player_one):
+                    self.max_component_player_one = c
+                elif r.owner == self.PLAYER_TWO and len(c) > len(self.max_component_player_two):
+                    self.max_component_player_two = c
 
-        if len(max_component_player_one) == len(max_component_player_two):
-            return None
-        elif len(max_component_player_one) > len(max_component_player_two):
-            max_component = max_component_player_one
+        if len(self.max_component_player_one) == len(self.max_component_player_two):            
+            return None, None
+        elif len(self.max_component_player_one) > len(self.max_component_player_two):
+            max_component = self.max_component_player_one
         else:
-            max_component = max_component_player_two        
+            max_component = self.max_component_player_two     
 
-        for c in max_component:
-            self.grid[c].marked = True
+        owner = self.grid[max_component[0]].ring.owner
 
-        return self.grid[max_component[0]].ring.owner
+        return max_component, owner
 
     def check_winner(self) -> None: 
         for s in self.grid:
@@ -282,75 +256,78 @@ class Game:
             self.winner = self.turn            
             self.end = True
             return True        
-        
+                
+        max_c, owner = self.most_donuts()
         if self.player_rings == [0, 0]:
-            self.winner = self.most_donuts()
+            if max_c is not None:
+                for c in max_c:
+                    self.grid[c].marked = True                
+            self.winner = owner
             self.end = True
             return True
         
         return False                    
 
     def evaluate(self, x: int, y: int) -> None:    
+        me = self.get_me(x, y)
+        self.grid[me].ring = Ring(self.turn)            
+        self.grid[me].blocked = True  
+        self.player_rings[self.turn] -= 1
         self.grab_donuts(x, y)        
         self.check_winner()    
+        self.change_slots(x, y, self.grid[me].direction)  
+        self.step += 1
+
+        child = Node(self.serialize_state()) 
+        child.move = self.get_me(x, y)
+        child.heuristic_p1 = self.heuristic(Game.PLAYER_ONE)
+        child.heuristic_p2 = self.heuristic(Game.PLAYER_TWO)
+
+        self.state_tree_reference = self.state_tree_reference.add_child(child)    
+        
+        self.turn = Game.PLAYER_TWO if self.turn == Game.PLAYER_ONE else Game.PLAYER_ONE
 
     def save_state(self) -> dict:
-        state = {'grid': copy.deepcopy(self.grid), 'player_rings': self.player_rings.copy(), 'turn': self.turn, 'end': self.end, 'winner': self.winner, 'step': self.step}
+        state = {
+            'grid': copy.deepcopy(self.grid), 
+            'player_rings': self.player_rings.copy(), 
+            'turn': self.turn, 
+            'end': self.end, 
+            'winner': self.winner, 
+            'step': self.step,
+            'tree_reference': self.state_tree_reference,       
+            'max_c_p1': self.max_component_player_one,
+            'max_c_p2': self.max_component_player_two,
+            'last_move': self.last_move
+        }
+
         self.states.append(state)
     
     def last_state(self) -> bool:        
         if self.states:
             state = self.states.pop()
             
-            self.grid         = state['grid']
-            self.player_rings = state['player_rings']
-            self.turn         = state['turn']
-            self.end          = state['end']
-            self.winner       = state['winner']
-            self.step         = state['step']
+            self.grid                     = state['grid']
+            self.player_rings             = state['player_rings']
+            self.turn                     = state['turn']
+            self.end                      = state['end']
+            self.winner                   = state['winner']
+            self.step                     = state['step']            
+            self.max_component_player_one = state['max_c_p1']
+            self.max_component_player_two = state['max_c_p2']
+            self.last_move                = state['last_move']            
 
-            self.set_stree_reference(self.state_tree_reference.parent)            
-
-            if self.xml_file_name is not None:
-                self.state_tree.print_tree(self.xml_file_name)
+            self.state_tree_reference = state['tree_reference']   
             
             return True
         return False
     
-    def serialize_state(self, i = None) -> str:        
-        owners = self.get_owners(self.grid)
-        if i is not None:
-            owners[i] = 2
+    def serialize_state(self) -> str:        
+        owners = self.get_owners(self.grid)        
         return f"{owners}:{self.player_rings}:{self.turn}:{self.end}:{self.winner}:{self.step}"
 
-    def expand_next_states(self) -> list[Game]:      
-        doppelgangers = []  
-
-        for i in range(0, 36):
-            if self.grid[i].blocked or self.grid[i].ring is not None:
-                continue
-
-            doppelganger = copy.deepcopy(self)                                                
-            doppelganger.turn = Game.PLAYER_TWO if self.turn == Game.PLAYER_ONE else Game.PLAYER_ONE            
-
-            slot = doppelganger.grid[i]
-            
-            x, y = doppelganger.get_xy(i)
-            slot.ring = Ring(doppelganger.turn)            
-            slot.blocked = True                       
-            doppelganger.player_rings[doppelganger.turn] -= 1
-            doppelganger.evaluate(x, y)       
-            doppelganger.change_slots(x, y, slot.direction)      
-            doppelganger.step += 1        
-
-            doppelgangers.append((doppelganger, i))
-
-        return doppelgangers
-
-    def set_stree_reference(self, new_reference):
-        self.state_tree_reference.remove_xml_attribute('active')
-        self.state_tree_reference = new_reference
-        self.state_tree_reference.set_xml_attribute('active', 'True')   
+    def get_valid_moves(self) -> list:      
+        return [i for i in range(36) if not self.grid[i].blocked and self.grid[i].ring is None]
 
     def place_ring(self, x: int, y: int) -> bool:        
         if not self.end and 0 <= x < 6 and 0 <= y < 6 and self.player_rings[self.turn] > 0:
@@ -360,24 +337,8 @@ class Game:
             if slot_2_place.ring == None and not slot_2_place.blocked:
                 self.save_state()
 
-                slot_2_place.ring = Ring(self.turn)   
-                slot_2_place.blocked = True                 
-                self.player_rings[self.turn] -= 1
-                self.evaluate(x, y)                    
-                self.change_slots(x, y, slot_2_place.direction)     
-
-                child = Node(self.serialize_state(self.get_me(x, y)))                               
-                self.set_stree_reference(self.state_tree_reference.add_child(child))  
-
-                if not self.end:                      
-                    print(self.calculate_best_play(self.dificulty))                    
-
-                self.turn = Game.PLAYER_TWO if self.turn == Game.PLAYER_ONE else Game.PLAYER_ONE 
-
-                self.step += 1
-
-                if self.xml_file_name is not None:
-                    self.state_tree.print_tree(self.xml_file_name)
+                self.evaluate(x, y)                                    
+                self.last_move = y * 6 + x
 
                 return True
             else:
@@ -385,62 +346,153 @@ class Game:
             
         return False
     
+    def save_tree_xml(self):        
+        if self.xml_file_name is not None:
+            self.state_tree.save_to_xml(self.xml_file_name, active_node=self.state_tree_reference)
 
-    def minimax(self, state: Game, i: int, parent_node: Node, depth: int = -1, maximizingPlayer: bool = True):
-        current_node = Node(state.serialize_state(i))
-        if parent_node is not None:
-            parent_node.add_child(current_node)
-        
-        if depth == 0 or state.end:
-            return state.heuristic(state), [current_node]
-        
-        next_states = state.expand_next_states()
-        if not next_states:
-            return state.heuristic(state), [current_node]
+    def minimax(self, depth: int = -1, maximizingPlayer: bool = True, favorite = PLAYER_ONE) -> int:        
+        valid_moves = self.get_valid_moves()
+        if depth == 0 or self.end or not valid_moves:     
+            serial = self.serialize_state().split(':')
+            serial[2] = str(Game.PLAYER_ONE) if int(serial[2]) == Game.PLAYER_TWO else str(Game.PLAYER_ONE)
+            serial = ':'.join(serial)
+            known_state: Node = self.state_tree.node_index.get(serial)                
+            if known_state is not None:     
+                if favorite == Game.PLAYER_ONE:                           
+                    return known_state.heuristic_p1
+                else:
+                    return known_state.heuristic_p2
+            return self.heuristic(favorite)    
 
         best_score = -float('inf') if maximizingPlayer else float('inf')
-        best_path = []
-
-        for next_game, move_i in next_states:
-            score, path = self.minimax(next_game, move_i, current_node, depth - 1, not maximizingPlayer)
+        
+        for move in valid_moves:              
             
-            if maximizingPlayer:
-                if score > best_score:
-                    best_score = score
-                    best_path = [current_node] + path
-            else:
-                if score < best_score:
-                    best_score = score
-                    best_path = [current_node] + path
-                    
-        return best_score, best_path
-    
-    def heuristic(self, state: Game):
-        if state.winner == Game.PLAYER_TWO:
-            return 10000
-        elif state.winner == Game.PLAYER_ONE:
-            return -10000
-        else:
-            return 0
+            x, y = self.get_xy(move)
 
-    def calculate_best_play(self, depth: int) -> int:  
+            if self.place_ring(x, y):            
+
+                score = self.minimax(depth - 1, not maximizingPlayer, favorite)
+
+                self.last_state()
+
+                if maximizingPlayer:
+                    if score > best_score:
+                        best_score = score
+                else:
+                    if score < best_score:
+                        best_score = score
+                        
+        return best_score
+    
+    def minimax_alpha_beta(self, depth: int = -1, alpha: float = -float('inf'), beta: float = float('inf'), maximizingPlayer: bool = True, favorite = PLAYER_ONE) -> int:        
+        valid_moves = self.get_valid_moves()
+        if depth == 0 or self.end or not valid_moves:
+            serial = self.serialize_state().split(':')
+            serial[2] = str(Game.PLAYER_ONE) if int(serial[2]) == Game.PLAYER_TWO else str(Game.PLAYER_ONE)
+            serial = ':'.join(serial)
+            known_state: Node = self.state_tree.node_index.get(serial)    
+            if known_state is not None:                          
+                if favorite == Game.PLAYER_ONE:                           
+                    return known_state.heuristic_p1
+                else:
+                    return known_state.heuristic_p2
+            return self.heuristic(favorite)
+
+        best_score = -float('inf') if maximizingPlayer else float('inf')
+        
+        for move in valid_moves:             
+            x, y = self.get_xy(move)
+
+            if self.place_ring(x, y):
+                
+                score = self.minimax_alpha_beta(depth - 1, alpha, beta, not maximizingPlayer, favorite)
+
+                self.last_state()
+
+                if maximizingPlayer:
+                    if score > best_score:
+                        best_score = score
+                    
+                    alpha = max(alpha, best_score)
+                    if beta <= alpha:
+                        break  
+                else:
+                    if score < best_score:
+                        best_score = score
+                    
+                    beta = min(beta, best_score)
+                    if beta <= alpha:
+                        break  
+                        
+        return best_score
+
+    def heuristic(self, favorite) -> int:
+        h = (len(self.max_component_player_one) - len(self.max_component_player_two)) * 3
+        if favorite == Game.PLAYER_TWO:
+            h = -h
+
+        for i in range(0, 6):
+            if self.last_move in range(i*6, i*6 + 6):
+                if favorite == Game.PLAYER_ONE:
+                    h -= self.placed_rings[1][i] 
+                    h += self.placed_rings[0][i] * 2
+                else:
+                    h -= self.placed_rings[0][i] 
+                    h += self.placed_rings[1][i] * 2
+            if self.last_move in range(i, 36, 6):
+                if favorite == Game.PLAYER_ONE:
+                    h -= self.placed_rings[1][i + 1] 
+                    h += self.placed_rings[0][i + 1] * 2
+                else:
+                    h -= self.placed_rings[0][i + 1]
+                    h += self.placed_rings[1][i + 1] * 2
+
+        ranges = [range(5, 31, 5), range(4, 25, 5), range(11, 32, 5), range(0, 35, 7), range(1, 30, 7), range(6, 35, 7)]        
+
+        i = 12
+
+        for r in ranges:
+            if self.last_move in r:
+                if favorite == Game.PLAYER_ONE:
+                    h -= self.placed_rings[1][i] * 2
+                    h += self.placed_rings[0][i]
+                else:
+                    h -= self.placed_rings[0][i] * 2
+                    h += self.placed_rings[1][i] 
+            i += 1
+
+        h += self.donuts_taken * 10 * (1 if self.turn == favorite else -1)
+
+        if self.winner == favorite:
+            h += 1000
+        elif self.winner is not None:
+            h -= 1000   
+
+        return h 
+
+    def calculate_best_play(self, favorite, depth: int = 1, use_alpha_beta: bool = False) -> int:  
         player = self.turn  
         best_score = -float('inf')
         best_index = -1
-        best_nodes_path = []
 
-        next_states = self.expand_next_states()
-        
-        for next_game, i in next_states:
-            score, path = self.minimax(next_game, i, self.state_tree_reference, depth, player == Game.PLAYER_ONE)
-            
-            if score > best_score:
-                best_score = score
-                best_index = i
-                best_nodes_path = path
-
-        for node in best_nodes_path:
-            if node is not None:
-                node.set_xml_attribute('best', 'True')
+        valid_moves = self.get_valid_moves()        
                 
+        for move in valid_moves:            
+
+            x, y = self.get_xy(move)
+            
+            if self.place_ring(x, y):
+
+                if use_alpha_beta:
+                    score = self.minimax_alpha_beta(depth - 1, maximizingPlayer=player == favorite, favorite=favorite) 
+                else:
+                    score = self.minimax(depth - 1, player == favorite, favorite) 
+
+                self.last_state()                     
+                
+                if score > best_score:
+                    best_score = score
+                    best_index = move
+
         return best_index

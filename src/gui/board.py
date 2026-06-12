@@ -64,13 +64,6 @@ class Board(pygame.Surface):
         self.draw_squares()   
         self.update_trays()
 
-    def place_donut(self, square: Square) -> None:
-        if self.game.place_ring(square.id % 6, square.id // 6):            
-            if self.game.turn == Game.PLAYER_TWO:
-                self.tray1.place_donut(square)      
-            elif self.game.turn == Game.PLAYER_ONE:
-                self.tray2.place_donut(square)      
-
     def handle_click(self, mouse_pos: tuple, board_offset: tuple = (0, 0)) -> Square | None:
                         
         adjusted_pos = (mouse_pos[0] - board_offset[0], mouse_pos[1] - board_offset[1])
