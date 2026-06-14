@@ -74,32 +74,36 @@ def run_game():
 
         total_time = 0
         
-        with open(f'{test_path}/log.txt', 'w') as output_log:
+        with open(f'{test_path}/log.csv', 'w') as output_log:
             try:
-                for limit_p1 in range(bottom, top + 1):
-                    for limit_p2 in range(bottom, top + 1):
-                        if limit_p2 == limit_p1:
-                            for i in range(test_load):
-                                label = f'seed_{seed}_minimax_{limit_p1}_vs_alphabeta_{limit_p2}_{i+1}'
-                                tree_path = f'{test_path}/tree_{label}.xml'
-                                game = Game(seed=seed, xml_file_name=tree_path)
-                                params = {Game.PLAYER_ONE: [limit_p1, False], Game.PLAYER_TWO: [limit_p2, True]}
-                                start_time = time.perf_counter()
-                                while not game.end:
-                                    position = game.calculate_best_play(game.turn, depth=params[game.turn][0], use_alpha_beta=params[game.turn][1])
-                                    x, y = game.get_xy(position)
-                                    game.place_ring(x, y)
-                                game.save_tree_xml()
-                                end_time = time.perf_counter()
-                                execution_time = end_time - start_time
-                                total_time += execution_time
-                                output_log.write(label + "\n")
-                                output_log.write(f"Execution time: {execution_time:.6f} seconds\t Winner: {game.winner}\n\n")
+                for alpha_beta_p1 in range(2):
+                    for alpha_beta_p2 in range(2):
+                        for limit_p1 in range(bottom, top + 1):
+                            for limit_p2 in range(bottom, top + 1):                        
+                                mean_time = 0
+                                label = f's_{seed}_{"ab" if alpha_beta_p1 == 1 else "mm"}_{limit_p1}_x_{"ab" if alpha_beta_p2 else "mm"}_{limit_p2}'
+                                for i in range(test_load):
+                                    label_i = label + f"_{i+1}"
+                                    tree_path = f'{test_path}/tree_{label_i}.xml'
+                                    game = Game(seed=seed, xml_file_name=tree_path)
+                                    params = {Game.PLAYER_ONE: [limit_p1, False], Game.PLAYER_TWO: [limit_p2, True]}
+                                    start_time = time.perf_counter()
+                                    while not game.end:
+                                        position = game.calculate_best_play(game.turn, depth=params[game.turn][0], use_alpha_beta=params[game.turn][1])
+                                        x, y = game.get_xy(position)
+                                        game.place_ring(x, y)
+                                    game.save_tree_xml()
+                                    end_time = time.perf_counter()
+                                    execution_time = end_time - start_time
+                                    mean_time += execution_time
+                                    total_time += execution_time
+                                    output_log.write(f"{label_i} {execution_time:.6f} {game.winner} {len(game.state_tree.node_index.keys())}\n")                                
+                                mean_time /= test_load                            
+                                print(f"\nMean time for {label}: {mean_time:.6f} seconds")
             except:
                 print("Execution stopped.")
-            finally:
-                output_log.write(f"Total Execution time: {total_time:.6f} seconds.\n")
-                print(f"Total Execution time: {total_time:.6f} seconds.\n")
+            finally:                
+                print(f"\nTotal Execution time: {total_time:.6f} seconds.\n")
 
         exit(0)
     if '-reset' in sys.argv and os.path.exists(f'{script_dir}/tree.xml'):
@@ -177,6 +181,8 @@ def run_game():
             if autonomous_p1 and game.turn == Game.PLAYER_ONE or autonomous_p2 and game.turn == Game.PLAYER_TWO: 
                 if autonomous_p1 and autonomous_p2:
                     sleep(0.5 / (min(p1_expertise, p2_expertise) + 0.1))
+                elif autonomous_p1 or autonomous_p2:
+                    sleep(0.5 / (max(p1_expertise, p2_expertise) + 0.1))
 
                 if autonomous_p1 and game.turn == Game.PLAYER_ONE:
                     position = game.calculate_best_play(game.PLAYER_ONE, depth=p1_expertise, use_alpha_beta=p1_alpha_beta)

@@ -3,7 +3,6 @@ from core.ring import Ring
 from core.graph import Graph
 from util.tree import Node
 import random
-import math
 import copy
 
 class Game:    
@@ -26,13 +25,10 @@ class Game:
                 
         self.max_component_player_one = []
         self.max_component_player_two = []
-        self.placed_rings = [[0] * 18 for _ in range(2)] 
-        self.last_move = None
-        self.donuts_taken = 0
         
         for i in range(0, 36):                  
             self.grid.append(Slot(random.randint(0, 3)))
-
+  
         if xml_file_name is not None:
             self.state_tree.load_from_xml(xml_file_name)
             self.xml_file_name = xml_file_name    
@@ -48,12 +44,6 @@ class Game:
             return y * 6 + x
         return None
 
-    def get_theta(self, x0: int, y0: int, x1: int, y1: int) -> int:
-        if x0 == x1:
-            return 90 if y1 > y0 else -90
-        else:
-            return int(math.degrees(math.atan((y1 - y0) / (x1 - x0))))
-
     def change_slots(self, x0: int, y0: int, direction: int):
         for i in range(0, 36):        
 
@@ -63,24 +53,21 @@ class Game:
             x = i % 6
             y = i // 6                 
             if x == x0 and y == y0:
-                continue
+                continue            
 
-            theta = self.get_theta(x0, y0, x, y)
+            dx = x - x0
+            dy = y - y0
 
-            if direction == Slot.SECOND_DIAGONAL:                
-                self.grid[i].blocked = theta != -45
+            if direction == Slot.SECOND_DIAGONAL:
+                self.grid[i].blocked = not (dx == -dy)
             elif direction == Slot.FIRST_DIAGONAL:           
-                self.grid[i].blocked = theta != 45
+                self.grid[i].blocked = not (dx == dy)
             elif direction == Slot.VERTICAL:            
-                self.grid[i].blocked = abs(theta) != 90 
+                self.grid[i].blocked = not (dx == 0)
             elif direction == Slot.HORIZONTAL:            
-                self.grid[i].blocked = theta != 0
-      
-        count = 0
-        for s in self.grid:
-            if s.blocked:
-                count += 1
-        if count == 36:
+                self.grid[i].blocked = not (dy == 0)
+              
+        if len(self.get_valid_moves()) == 0:
             for s in self.grid:
                 if s.ring == None:
                     s.blocked = False
@@ -104,15 +91,16 @@ class Game:
                 horizontal.append(self.grid[i].ring)
                 continue
 
-            theta = self.get_theta(x, y, xi, yi)
+            dx = xi - x
+            dy = yi - y
         
-            if theta == -45:                
+            if dx == -dy: 
                 second_diagonal.append(self.grid[i].ring)
-            elif theta == 45:
+            elif dx == dy:
                 first_diagonal.append(self.grid[i].ring)
-            elif abs(theta) == 90:
+            elif dx == 0:
                 vertical.append(self.grid[i].ring)
-            elif theta == 0:
+            elif dy == 0:
                 horizontal.append(self.grid[i].ring)
 
         return [second_diagonal, first_diagonal, vertical, horizontal]
@@ -121,9 +109,7 @@ class Game:
 
         neighbors = self.get_neighbors(x, y)
 
-        myself = self.grid[self.get_me(x, y)].ring
-
-        self.donuts_taken = 0
+        myself = self.grid[self.get_me(x, y)].ring        
                         
         for directed_neighbors in neighbors:                                        
             neighborhood_clusters = []
@@ -160,9 +146,7 @@ class Game:
                     continue
                 
                 edges[0].owner = self.turn
-                edges[1].owner = self.turn
-
-                self.donuts_taken += 1
+                edges[1].owner = self.turn                
     
     def is_sublist(self, sub: list, main: list):
         n = len(sub)
@@ -190,17 +174,12 @@ class Game:
         lines.append(self.grid[5:31:5]) 
         lines.append(self.grid[4:25:5]) 
         lines.append(self.grid[11:32:5])
-        lines.append(self.grid[0:35:7]) 
+        lines.append(self.grid[0:36:7]) 
         lines.append(self.grid[1:30:7]) 
-        lines.append(self.grid[6:35:7])         
-        
-        self.placed_rings = [[0] * len(lines) for _ in range(2)] 
+        lines.append(self.grid[6:36:7])   
 
         for i in range(len(lines)):
-            owners = self.get_owners(lines[i])            
-            for o in owners:
-                if o == Game.PLAYER_ONE or o == Game.PLAYER_TWO:
-                    self.placed_rings[o][i] += 1            
+            owners = self.get_owners(lines[i])                                 
             if self.is_sublist(target, owners): 
                 for s in lines[i]:
                     if s.ring and s.ring.owner == self.turn:
@@ -213,10 +192,15 @@ class Game:
         graph = Graph()
         grid_owners = self.get_owners(self.grid)
         for i in range(0, 36):
+
+            if grid_owners[i] == -1:
+                continue
+
             top = i - 6 
             left = i - 1
             right = i + 1
             bottom = i + 6
+
             if top >= 0 and grid_owners[top] == grid_owners[i]:
                 graph.addEdge(i, top)
             if left >= 0 and (left - 5) % 6 != 0 and grid_owners[left] == grid_owners[i]:
@@ -230,12 +214,12 @@ class Game:
         self.max_component_player_two = []
 
         for c in graph.getComponents():              
-            r = self.grid[c[0]].ring
-            if r is not None:
+            r = self.grid[c[0]].ring     
+            if r is not None:       
                 if r.owner == self.PLAYER_ONE and len(c) > len(self.max_component_player_one):
                     self.max_component_player_one = c
                 elif r.owner == self.PLAYER_TWO and len(c) > len(self.max_component_player_two):
-                    self.max_component_player_two = c
+                    self.max_component_player_two = c        
 
         if len(self.max_component_player_one) == len(self.max_component_player_two):            
             return None, None
@@ -268,7 +252,7 @@ class Game:
         
         return False                    
 
-    def evaluate(self, x: int, y: int) -> None:    
+    def evaluate(self, x: int, y: int) -> None:            
         me = self.get_me(x, y)
         self.grid[me].ring = Ring(self.turn)            
         self.grid[me].blocked = True  
@@ -280,7 +264,8 @@ class Game:
 
         child = Node(self.serialize_state()) 
         child.move = self.get_me(x, y)
-        child.heuristic_p1 = self.heuristic(Game.PLAYER_ONE)
+        
+        child.heuristic_p1 = self.heuristic(Game.PLAYER_ONE)                    
         child.heuristic_p2 = self.heuristic(Game.PLAYER_TWO)
 
         self.state_tree_reference = self.state_tree_reference.add_child(child)    
@@ -297,8 +282,7 @@ class Game:
             'step': self.step,
             'tree_reference': self.state_tree_reference,       
             'max_c_p1': self.max_component_player_one,
-            'max_c_p2': self.max_component_player_two,
-            'last_move': self.last_move
+            'max_c_p2': self.max_component_player_two,                                    
         }
 
         self.states.append(state)
@@ -314,8 +298,7 @@ class Game:
             self.winner                   = state['winner']
             self.step                     = state['step']            
             self.max_component_player_one = state['max_c_p1']
-            self.max_component_player_two = state['max_c_p2']
-            self.last_move                = state['last_move']            
+            self.max_component_player_two = state['max_c_p2']                                     
 
             self.state_tree_reference = state['tree_reference']   
             
@@ -336,13 +319,8 @@ class Game:
 
             if slot_2_place.ring == None and not slot_2_place.blocked:
                 self.save_state()
-
-                self.evaluate(x, y)                                    
-                self.last_move = y * 6 + x
-
+                self.evaluate(x, y) 
                 return True
-            else:
-                return False
             
         return False
     
@@ -353,18 +331,19 @@ class Game:
     def minimax(self, depth: int = -1, maximizingPlayer: bool = True, favorite = PLAYER_ONE) -> int:        
         valid_moves = self.get_valid_moves()
         if depth == 0 or self.end or not valid_moves:     
-            serial = self.serialize_state().split(':')
-            serial[2] = str(Game.PLAYER_ONE) if int(serial[2]) == Game.PLAYER_TWO else str(Game.PLAYER_ONE)
-            serial = ':'.join(serial)
-            known_state: Node = self.state_tree.node_index.get(serial)                
-            if known_state is not None:     
-                if favorite == Game.PLAYER_ONE:                           
-                    return known_state.heuristic_p1
-                else:
-                    return known_state.heuristic_p2
-            return self.heuristic(favorite)    
+            # serial = self.serialize_state().split(':')
+            # serial[2] = str(Game.PLAYER_ONE) if int(serial[2]) == Game.PLAYER_TWO else str(Game.PLAYER_TWO)
+            # serial = ':'.join(serial)
+            # known_state: Node = self.state_tree.node_index.get(serial)                
+            # if known_state is not None:     
+            #     if favorite == Game.PLAYER_ONE:                           
+            #         return known_state.heuristic_p1, -1
+            #     else:
+            #         return known_state.heuristic_p2, -1
+            return self.heuristic(favorite), -1  
 
         best_score = -float('inf') if maximizingPlayer else float('inf')
+        best_move = -1
         
         for move in valid_moves:              
             
@@ -372,47 +351,51 @@ class Game:
 
             if self.place_ring(x, y):            
 
-                score = self.minimax(depth - 1, not maximizingPlayer, favorite)
+                score, _ = self.minimax(depth - 1, not maximizingPlayer, favorite)
 
                 self.last_state()
 
                 if maximizingPlayer:
                     if score > best_score:
                         best_score = score
+                        best_move = move
                 else:
                     if score < best_score:
                         best_score = score
+                        best_move = move
                         
-        return best_score
+        return best_score, best_move
     
     def minimax_alpha_beta(self, depth: int = -1, alpha: float = -float('inf'), beta: float = float('inf'), maximizingPlayer: bool = True, favorite = PLAYER_ONE) -> int:        
         valid_moves = self.get_valid_moves()
         if depth == 0 or self.end or not valid_moves:
-            serial = self.serialize_state().split(':')
-            serial[2] = str(Game.PLAYER_ONE) if int(serial[2]) == Game.PLAYER_TWO else str(Game.PLAYER_ONE)
-            serial = ':'.join(serial)
-            known_state: Node = self.state_tree.node_index.get(serial)    
-            if known_state is not None:                          
-                if favorite == Game.PLAYER_ONE:                           
-                    return known_state.heuristic_p1
-                else:
-                    return known_state.heuristic_p2
-            return self.heuristic(favorite)
+            # serial = self.serialize_state().split(':')
+            # serial[2] = str(Game.PLAYER_ONE) if int(serial[2]) == Game.PLAYER_TWO else str(Game.PLAYER_TWO)
+            # serial = ':'.join(serial)
+            # known_state: Node = self.state_tree.node_index.get(serial)    
+            # if known_state is not None:                          
+            #     if favorite == Game.PLAYER_ONE:                           
+            #         return known_state.heuristic_p1, -1
+            #     else:
+            #         return known_state.heuristic_p2, -1
+            return self.heuristic(favorite), -1
 
         best_score = -float('inf') if maximizingPlayer else float('inf')
-        
+        best_move = -1
+
         for move in valid_moves:             
             x, y = self.get_xy(move)
 
             if self.place_ring(x, y):
                 
-                score = self.minimax_alpha_beta(depth - 1, alpha, beta, not maximizingPlayer, favorite)
+                score, _ = self.minimax_alpha_beta(depth - 1, alpha, beta, not maximizingPlayer, favorite)
 
                 self.last_state()
 
                 if maximizingPlayer:
                     if score > best_score:
                         best_score = score
+                        best_move = move
                     
                     alpha = max(alpha, best_score)
                     if beta <= alpha:
@@ -420,49 +403,54 @@ class Game:
                 else:
                     if score < best_score:
                         best_score = score
+                        best_move = move
                     
                     beta = min(beta, best_score)
                     if beta <= alpha:
                         break  
                         
-        return best_score
+        return best_score, best_move
 
     def heuristic(self, favorite) -> int:
+        opponent = Game.PLAYER_TWO if favorite == Game.PLAYER_ONE else Game.PLAYER_ONE
+
         h = (len(self.max_component_player_one) - len(self.max_component_player_two)) * 3
         if favorite == Game.PLAYER_TWO:
             h = -h
 
-        for i in range(0, 6):
-            if self.last_move in range(i*6, i*6 + 6):
-                if favorite == Game.PLAYER_ONE:
-                    h -= self.placed_rings[1][i] 
-                    h += self.placed_rings[0][i] * 2
+        lines = []
+
+        for i in range(6):
+            lines.append(self.grid[i*6 : i*6+6]) 
+            lines.append(self.grid[i :: 6])      
+        
+        lines.append(self.grid[5:31:5]) 
+        lines.append(self.grid[4:25:5]) 
+        lines.append(self.grid[11:32:5])
+        lines.append(self.grid[0:36:7]) 
+        lines.append(self.grid[1:30:7]) 
+        lines.append(self.grid[6:36:7])     
+
+        def line_score(player, owners):
+            score = 0
+            run = 0
+
+            for o in owners:
+                if o == player:
+                    run += 1
                 else:
-                    h -= self.placed_rings[0][i] 
-                    h += self.placed_rings[1][i] * 2
-            if self.last_move in range(i, 36, 6):
-                if favorite == Game.PLAYER_ONE:
-                    h -= self.placed_rings[1][i + 1] 
-                    h += self.placed_rings[0][i + 1] * 2
-                else:
-                    h -= self.placed_rings[0][i + 1]
-                    h += self.placed_rings[1][i + 1] * 2
+                    if run:
+                        score += 2 ** run
+                    run = 0
 
-        ranges = [range(5, 31, 5), range(4, 25, 5), range(11, 32, 5), range(0, 35, 7), range(1, 30, 7), range(6, 35, 7)]        
+            if run:
+                score += 2 ** run
 
-        i = 12
+            return score
 
-        for r in ranges:
-            if self.last_move in r:
-                if favorite == Game.PLAYER_ONE:
-                    h -= self.placed_rings[1][i] * 2
-                    h += self.placed_rings[0][i]
-                else:
-                    h -= self.placed_rings[0][i] * 2
-                    h += self.placed_rings[1][i] 
-            i += 1
-
-        h += self.donuts_taken * 10 * (1 if self.turn == favorite else -1)
+        for l in lines:
+            h += line_score(favorite, self.get_owners(l))
+            h -= line_score(opponent, self.get_owners(l))
 
         if self.winner == favorite:
             h += 1000
@@ -472,27 +460,12 @@ class Game:
         return h 
 
     def calculate_best_play(self, favorite, depth: int = 1, use_alpha_beta: bool = False) -> int:  
-        player = self.turn  
-        best_score = -float('inf')
+        player = self.turn          
         best_index = -1
 
-        valid_moves = self.get_valid_moves()        
-                
-        for move in valid_moves:            
-
-            x, y = self.get_xy(move)
-            
-            if self.place_ring(x, y):
-
-                if use_alpha_beta:
-                    score = self.minimax_alpha_beta(depth - 1, maximizingPlayer=player == favorite, favorite=favorite) 
-                else:
-                    score = self.minimax(depth - 1, player == favorite, favorite) 
-
-                self.last_state()                     
-                
-                if score > best_score:
-                    best_score = score
-                    best_index = move
+        if use_alpha_beta:
+            _, best_index = self.minimax_alpha_beta(depth, maximizingPlayer=player == favorite, favorite=favorite) 
+        else:
+            _, best_index = self.minimax(depth, player == favorite, favorite)             
 
         return best_index

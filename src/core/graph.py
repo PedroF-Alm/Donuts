@@ -29,6 +29,9 @@ class Graph:
                     visited[i] = True
 
     def getComponents(self):
+        if not self.graph.items():
+            return []
+
         V = max(self.graph) + 1
         visited = [False] * V
         res = []

@@ -8,8 +8,8 @@ class Node():
         self.children = []
         self.parent = None  
         self.node_index = {}    
-        self.heuristic_p1 = 0    
-        self.heuristic_p2 = 0
+        self.heuristic_p1 = -float('inf')
+        self.heuristic_p2 = -float('inf')
         self.move = -1           
 
     def load_from_xml(self, xml_file_name: str) -> None:
