@@ -264,8 +264,8 @@ class Game:
 
         child = Node(self.serialize_state()) 
         child.move = self.get_me(x, y)
-        
-        child.heuristic_p1 = self.heuristic(Game.PLAYER_ONE)                    
+
+        child.heuristic_p1 = self.heuristic(Game.PLAYER_ONE)
         child.heuristic_p2 = self.heuristic(Game.PLAYER_TWO)
 
         self.state_tree_reference = self.state_tree_reference.add_child(child)    
@@ -309,7 +309,9 @@ class Game:
         owners = self.get_owners(self.grid)        
         return f"{owners}:{self.player_rings}:{self.turn}:{self.end}:{self.winner}:{self.step}"
 
-    def get_valid_moves(self) -> list:      
+    def get_valid_moves(self) -> list:    
+        if self.end:
+            return []  
         return [i for i in range(36) if not self.grid[i].blocked and self.grid[i].ring is None]
 
     def place_ring(self, x: int, y: int) -> bool:        
@@ -329,18 +331,14 @@ class Game:
             self.state_tree.save_to_xml(self.xml_file_name, active_node=self.state_tree_reference)
 
     def minimax(self, depth: int = -1, maximizingPlayer: bool = True, favorite = PLAYER_ONE) -> int:        
+        if depth == 0 or self.end:
+
+            if self.end:
+                return 1000 if self.winner == favorite else -1000, -1            
+                    
+            return self.heuristic(favorite), -1         
+        
         valid_moves = self.get_valid_moves()
-        if depth == 0 or self.end or not valid_moves:     
-            # serial = self.serialize_state().split(':')
-            # serial[2] = str(Game.PLAYER_ONE) if int(serial[2]) == Game.PLAYER_TWO else str(Game.PLAYER_TWO)
-            # serial = ':'.join(serial)
-            # known_state: Node = self.state_tree.node_index.get(serial)                
-            # if known_state is not None:     
-            #     if favorite == Game.PLAYER_ONE:                           
-            #         return known_state.heuristic_p1, -1
-            #     else:
-            #         return known_state.heuristic_p2, -1
-            return self.heuristic(favorite), -1  
 
         best_score = -float('inf') if maximizingPlayer else float('inf')
         best_move = -1
@@ -367,18 +365,14 @@ class Game:
         return best_score, best_move
     
     def minimax_alpha_beta(self, depth: int = -1, alpha: float = -float('inf'), beta: float = float('inf'), maximizingPlayer: bool = True, favorite = PLAYER_ONE) -> int:        
+        if depth == 0 or self.end:
+
+            if self.end:
+                return 1000 if self.winner == favorite else -1000, -1                       
+            
+            return self.heuristic(favorite), -1  
+        
         valid_moves = self.get_valid_moves()
-        if depth == 0 or self.end or not valid_moves:
-            # serial = self.serialize_state().split(':')
-            # serial[2] = str(Game.PLAYER_ONE) if int(serial[2]) == Game.PLAYER_TWO else str(Game.PLAYER_TWO)
-            # serial = ':'.join(serial)
-            # known_state: Node = self.state_tree.node_index.get(serial)    
-            # if known_state is not None:                          
-            #     if favorite == Game.PLAYER_ONE:                           
-            #         return known_state.heuristic_p1, -1
-            #     else:
-            #         return known_state.heuristic_p2, -1
-            return self.heuristic(favorite), -1
 
         best_score = -float('inf') if maximizingPlayer else float('inf')
         best_move = -1
@@ -452,15 +446,10 @@ class Game:
             h += line_score(favorite, self.get_owners(l))
             h -= line_score(opponent, self.get_owners(l))
 
-        if self.winner == favorite:
-            h += 1000
-        elif self.winner is not None:
-            h -= 1000   
-
         return h 
 
     def calculate_best_play(self, favorite, depth: int = 1, use_alpha_beta: bool = False) -> int:  
-        player = self.turn          
+        player = self.turn
         best_index = -1
 
         if use_alpha_beta:
