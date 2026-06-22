@@ -160,11 +160,8 @@ class Game:
     
     def get_owners(self, slots: list[Slot]) -> list[int]:
         return list(map(lambda slt: self.get_owner(slt), slots))
-
-    def get_fives(self) -> bool:
-        target = [self.turn] * 5
-        result = False
-        
+    
+    def get_lines(self):
         lines = []
 
         for i in range(6):
@@ -177,6 +174,14 @@ class Game:
         lines.append(self.grid[0:36:7]) 
         lines.append(self.grid[1:30:7]) 
         lines.append(self.grid[6:36:7])   
+
+        return lines
+
+    def get_fives(self) -> bool:
+        target = [self.turn] * 5
+        result = False
+
+        lines = self.get_lines()
 
         for i in range(len(lines)):
             owners = self.get_owners(lines[i])                                 
@@ -281,8 +286,8 @@ class Game:
             'winner': self.winner, 
             'step': self.step,
             'tree_reference': self.state_tree_reference,       
-            'max_c_p1': self.max_component_player_one,
-            'max_c_p2': self.max_component_player_two,                                    
+            'max_c_p1': self.max_component_player_one.copy(),
+            'max_c_p2': self.max_component_player_two.copy(),
         }
 
         self.states.append(state)
@@ -404,6 +409,23 @@ class Game:
                         break  
                         
         return best_score, best_move
+    
+    def line_score(self, player, owners):
+        score = 0
+        run = 0
+
+        for o in owners:
+            if o == player:
+                run += 1
+            else:
+                if run:
+                    score += 2 ** run
+                run = 0
+
+        if run:
+            score += 2 ** run
+
+        return score
 
     def heuristic(self, favorite) -> int:
         opponent = Game.PLAYER_TWO if favorite == Game.PLAYER_ONE else Game.PLAYER_ONE
@@ -412,39 +434,11 @@ class Game:
         if favorite == Game.PLAYER_TWO:
             h = -h
 
-        lines = []
-
-        for i in range(6):
-            lines.append(self.grid[i*6 : i*6+6]) 
-            lines.append(self.grid[i :: 6])      
-        
-        lines.append(self.grid[5:31:5]) 
-        lines.append(self.grid[4:25:5]) 
-        lines.append(self.grid[11:32:5])
-        lines.append(self.grid[0:36:7]) 
-        lines.append(self.grid[1:30:7]) 
-        lines.append(self.grid[6:36:7])     
-
-        def line_score(player, owners):
-            score = 0
-            run = 0
-
-            for o in owners:
-                if o == player:
-                    run += 1
-                else:
-                    if run:
-                        score += 2 ** run
-                    run = 0
-
-            if run:
-                score += 2 ** run
-
-            return score
+        lines = self.get_lines()
 
         for l in lines:
-            h += line_score(favorite, self.get_owners(l))
-            h -= line_score(opponent, self.get_owners(l))
+            h += self.line_score(favorite, self.get_owners(l))
+            h -= self.line_score(opponent, self.get_owners(l))
 
         return h 
 
