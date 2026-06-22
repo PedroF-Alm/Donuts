@@ -24,10 +24,13 @@ class Learner():
         self.game: Game = None
     
     def get_q_values(self, q_table: dict, state: Game):
-        state = ':'.join(state.serialize_state().split(':')[:3])
-        if state not in q_table:
-            q_table[state] = np.zeros(36)
-        return q_table[state]
+        key = '['
+        for i in range(36):
+            key += f"({state.get_owner(state.grid[i])},{state.grid[i].blocked}){"," if i != 35 else ']'}"
+        key += f":{state.turn}"
+        if key not in q_table:
+            q_table[key] = np.zeros(36)
+        return q_table[key]
 
     def choose_action(self, q_table, state, valid_moves, epsilon):        
         q_values = self.get_q_values(q_table, state)
@@ -68,7 +71,7 @@ class Learner():
             mm_depth = 1
             for r in range(rounds):
                 try:
-                    self.game: Game = Game(seed=self.parameters['SEED'])            
+                    self.game: Game = Game(seed=r)            
                     game = self.game                    
 
                     q_player = random.choice([Game.PLAYER_ONE, Game.PLAYER_TWO])   
