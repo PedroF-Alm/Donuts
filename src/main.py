@@ -54,7 +54,7 @@ def run_game():
     using_gui = True
 
     learner = Learner()
-    learner.load_q_table()
+    learner.load_q_table()    
 
     if '-train' in sys.argv:
         rounds = int(input("Rounds: "))

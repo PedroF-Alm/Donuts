@@ -100,7 +100,7 @@ class Learner():
                             break
                        
                         # Opponent                        
-                        x, y = game.get_xy(game.calculate_best_play(mm_player, 1, True))
+                        x, y = game.get_xy(game.calculate_best_play(mm_player, mm_depth, True))
                         game.place_ring(x, y)    
 
                         next_state = copy.deepcopy(game)
@@ -110,8 +110,7 @@ class Learner():
                         self.learn(self.Q_TABLE, state, action, reward, next_state, next_valid_moves) 
                         
                     if game.winner == q_player:
-                        victory_log.write('1,')
-                        mm_depth += 1                        
+                        victory_log.write('1,')                       
                     elif game.winner == mm_player:
                         victory_log.write('-1,')
                     else:
