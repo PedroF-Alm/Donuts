@@ -24,7 +24,7 @@ class Learner():
         self.game: Game = None
     
     def get_q_values(self, q_table: dict, state: Game):
-        state = ':'.join(state.serialize_state().split(':')[:2])
+        state = ':'.join(state.serialize_state().split(':')[:3])
         if state not in q_table:
             q_table[state] = np.zeros(36)
         return q_table[state]
@@ -36,8 +36,8 @@ class Learner():
         if random.uniform(0, 1) < epsilon:
             return random.choice(valid_moves)
 
-        # EXPLOITATION                
-        best_value = max(q_values[a] for a in valid_moves)
+        # EXPLOITATION           
+        best_value = max(q_values[a] for a in valid_moves)        
 
         best_actions = [
             a for a in valid_moves
@@ -65,6 +65,7 @@ class Learner():
         epsilon = self.parameters['INITIAL_EPSILON']      
         script_dir = Path(__file__).resolve().parent          
         with open(f'{script_dir}/victory.csv', 'a') as victory_log:
+            mm_depth = 1
             for r in range(rounds):
                 try:
                     self.game: Game = Game(seed=self.parameters['SEED'])            
@@ -74,7 +75,7 @@ class Learner():
                     mm_player = Game.PLAYER_ONE if q_player == Game.PLAYER_TWO else Game.PLAYER_TWO
 
                     if game.turn == mm_player:                        
-                        x, y = game.get_xy(game.calculate_best_play(mm_player, 1, True))
+                        x, y = game.get_xy(game.calculate_best_play(mm_player, mm_depth, True))
                         game.place_ring(x, y)                 
 
                     while not game.end:                        
@@ -110,10 +111,11 @@ class Learner():
                         
                     if game.winner == q_player:
                         victory_log.write('1,')
+                        mm_depth += 1                        
                     elif game.winner == mm_player:
                         victory_log.write('-1,')
                     else:
-                        victory_log.write('0,')
+                        victory_log.write('0,')                        
 
                     if r % 1000 == 0:
                         self.save_q_table()
@@ -122,8 +124,7 @@ class Learner():
                     epsilon = max(self.parameters['EPSILON_MIN'], epsilon * self.parameters['EPSILON_DECAY'])
                 except Exception as e:
                     print(f"Training stopped on round {r}")                          
-                    print(e)
-                    raise                    
+                    print(e)                          
 
     def save_q_table(self, dir: str = '.'):
         script_dir = Path(__file__).resolve().parent

@@ -7,6 +7,7 @@ def run_game():
     import subprocess
     import platform
     import time
+    from core.learner import Learner
     from core.game import Game    
     from multiprocessing import Process, Queue
     from pathlib import Path
@@ -51,6 +52,14 @@ def run_game():
 
     seed = 1
     using_gui = True
+
+    learner = Learner()
+    learner.load_q_table()
+
+    if '-train' in sys.argv:
+        rounds = int(input("Rounds: "))
+        learner.train(rounds)
+        learner.save_q_table()
 
     if '-test' in sys.argv:
         print('Range of minimax limit: ')        
@@ -116,20 +125,25 @@ def run_game():
     autonomous_p1 = input("Autonomous player one? (y/n): ")[0] == "y"
     autonomous_p2 = input("Autonomous player two? (y/n): ")[0] == "y"
 
+    if autonomous_p1:
+        p1_learning = input("Autonomous player one learns? (y/n): ")[0] == "y"
+    if autonomous_p2:
+        p2_learning = input("Autonomous player two learns? (y/n): ")[0] == "y"
+
     p1_alpha_beta = False    
     p2_alpha_beta = False
 
     p1_expertise = 0
     p2_expertise = 0
 
-    if autonomous_p1:        
+    if autonomous_p1 and not p1_learning:        
         p1_alpha_beta = input("Autonomous player one uses alpha-beta? (y/n): ")[0] == "y"
-    if autonomous_p2:    
+    if autonomous_p2 and not p2_learning:    
         p2_alpha_beta = input("Autonomous player two uses alpha-beta? (y/n): ")[0] == "y"
 
-    if autonomous_p1:
+    if autonomous_p1 and not p1_learning:
         p1_expertise = int(input("Autonomous player one expertise (Minimax limit): "))
-    if autonomous_p2:
+    if autonomous_p2 and not p2_learning:
         p2_expertise = int(input("Autonomous player two expertise (Minimax limit): "))
 
     game = Game(seed=seed, xml_file_name=f'{script_dir}/tree.xml')
@@ -179,15 +193,24 @@ def run_game():
                     running = False     
 
             if autonomous_p1 and game.turn == Game.PLAYER_ONE or autonomous_p2 and game.turn == Game.PLAYER_TWO: 
-                if autonomous_p1 and autonomous_p2:
-                    sleep(0.5 / (min(p1_expertise, p2_expertise) + 0.1))
-                elif autonomous_p1 or autonomous_p2:
-                    sleep(0.5 / (max(p1_expertise, p2_expertise) + 0.1))
+                if p1_learning or p2_learning:
+                    sleep(0.5)
+                else:
+                    if autonomous_p1 and autonomous_p2:
+                        sleep(0.5 / (min(p1_expertise, p2_expertise) + 0.1))
+                    elif autonomous_p1 or autonomous_p2:
+                        sleep(0.5 / (max(p1_expertise, p2_expertise) + 0.1))
 
                 if autonomous_p1 and game.turn == Game.PLAYER_ONE:
-                    position = game.calculate_best_play(game.PLAYER_ONE, depth=p1_expertise, use_alpha_beta=p1_alpha_beta)
+                    if p1_learning and not game.end: 
+                        position = learner.choose_action(learner.Q_TABLE, game, game.get_valid_moves(), 0)
+                    else:
+                        position = game.calculate_best_play(game.PLAYER_ONE, depth=p1_expertise, use_alpha_beta=p1_alpha_beta)
                 else:
-                    position = game.calculate_best_play(game.PLAYER_TWO, depth=p2_expertise, use_alpha_beta=p2_alpha_beta)
+                    if p2_learning and not game.end:                        
+                        position = learner.choose_action(learner.Q_TABLE, game, game.get_valid_moves(), 0)
+                    else:
+                        position = game.calculate_best_play(game.PLAYER_TWO, depth=p2_expertise, use_alpha_beta=p2_alpha_beta)
 
                 if position != -1:
                     x, y = game.get_xy(position)  
