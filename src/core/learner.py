@@ -26,21 +26,21 @@ class Learner():
     def get_q_values(self, q_table: dict, state: Game, q_player: int): 
         if q_player == Game.PLAYER_ONE:       
             key = f"{len(state.max_component_player_one)}"
-            key += f",{len(state.max_component_player_two)}"
+            key += f":{len(state.max_component_player_two)}"
         else:
             key = f"{len(state.max_component_player_two)}"
-            key += f",{len(state.max_component_player_one)}"
-        key += f",{len(state.get_lines())}"
+            key += f":{len(state.max_component_player_one)}"
+        key += f":{len(state.get_lines())}"
         lines = state.get_lines()        
         for line in lines:
             owners = state.get_owners(line)
             mm_rings = owners.count(Game.PLAYER_ONE if q_player == Game.PLAYER_TWO else Game.PLAYER_TWO)
             q_rings = owners.count(q_player)
             available = len(owners) - mm_rings - q_rings
-            key += f",{q_rings},{mm_rings},{available}"
+            key += f":{q_rings}:{mm_rings}:{available}"
         blocked_count = sum([1 if state.grid[i].blocked else 0 for i in range(36)])
-        key += f",{blocked_count}"
-        key += f",{state.turn}"
+        key += f":{blocked_count}"
+        key += f":{state.turn}"
         if key not in q_table:
             q_table[key] = np.zeros(36)
         return q_table[key]
