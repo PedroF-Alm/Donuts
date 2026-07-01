@@ -23,119 +23,137 @@ class Learner():
             self.parameters[p] = parameters[p]        
         self.game: Game = None
     
-    def get_q_values(self, q_table: dict, state: Game):
-        key = '['
-        for i in range(36):
-            key += f"({state.get_owner(state.grid[i])},{state.grid[i].blocked}){"," if i != 35 else ']'}"
-        key += f":{state.turn}"
+    def get_q_values(self, q_table: dict, state: Game, q_player: int): 
+        if q_player == Game.PLAYER_ONE:       
+            key = f"{len(state.max_component_player_one)}"
+            key += f",{len(state.max_component_player_two)}"
+        else:
+            key = f"{len(state.max_component_player_two)}"
+            key += f",{len(state.max_component_player_one)}"
+        key += f",{len(state.get_lines())}"
+        lines = state.get_lines()        
+        for line in lines:
+            owners = state.get_owners(line)
+            mm_rings = owners.count(Game.PLAYER_ONE if q_player == Game.PLAYER_TWO else Game.PLAYER_TWO)
+            q_rings = owners.count(q_player)
+            available = len(owners) - mm_rings - q_rings
+            key += f",{q_rings},{mm_rings},{available}"
+        blocked_count = sum([1 if state.grid[i].blocked else 0 for i in range(36)])
+        key += f",{blocked_count}"
+        key += f",{state.turn}"
         if key not in q_table:
             q_table[key] = np.zeros(36)
         return q_table[key]
 
-    def choose_action(self, q_table, state, valid_moves, epsilon):        
-        q_values = self.get_q_values(q_table, state)
+    def choose_action(self, q_table: dict, state: Game, epsilon, q_player: int):        
+        q_values = self.get_q_values(q_table, state, q_player)
+
+        valid_moves = state.get_valid_moves()
 
         # EXPLORATION
         if random.uniform(0, 1) < epsilon:
             return random.choice(valid_moves)
 
-        # EXPLOITATION           
-        best_value = max(q_values[a] for a in valid_moves)        
+        # EXPLOITATION                
+        best_action = max(valid_moves, key=lambda a: q_values[a])
 
-        best_actions = [
-            a for a in valid_moves
-            if q_values[a] == best_value
-        ]
-
-        return random.choice(best_actions)        
+        return best_action     
     
     # ==========================================  
     # Q-LEARNING
     # ==========================================  
 
-    def learn(self, q_table, state, action, reward, next_state, next_valid_moves):
-        q_values      = self.get_q_values(q_table, state)
-        q_next_values = self.get_q_values(q_table, next_state)
+    def learn(self, q_table, state, action, reward, next_state, q_player):
+        q_values      = self.get_q_values(q_table, state, q_player)
+        q_next_values = self.get_q_values(q_table, next_state, q_player)
         old_value = q_values[action]
-        if next_valid_moves:
-            future_best = max(q_next_values[a] for a in next_valid_moves)
-        else:
-            future_best = 0
+
+        future_best = np.max(q_next_values)     
+
         new_value = old_value + self.parameters['LEARNING_RATE'] * (reward + self.parameters['DISCOUNT_FACTOR'] * future_best - old_value)
+
         q_values[action] = new_value
 
     def train(self, rounds: int):
+
         epsilon = self.parameters['INITIAL_EPSILON']      
         script_dir = Path(__file__).resolve().parent          
-        with open(f'{script_dir}/victory.csv', 'a') as victory_log:
-            mm_depth = 1
-            for r in range(rounds):
-                try:
-                    self.game: Game = Game(seed=r)            
-                    game = self.game                    
+    
+        mm_depth = 2
+        random_play = 0.5        
 
-                    q_player = random.choice([Game.PLAYER_ONE, Game.PLAYER_TWO])   
-                    mm_player = Game.PLAYER_ONE if q_player == Game.PLAYER_TWO else Game.PLAYER_TWO
+        for r in range(rounds):             
 
-                    if game.turn == mm_player:                        
-                        x, y = game.get_xy(game.calculate_best_play(mm_player, mm_depth, True))
-                        game.place_ring(x, y)                 
+            try:
+                self.game: Game = Game(seed=r)            
+                game = self.game                    
+                
+                q_player = random.choice([Game.PLAYER_ONE, Game.PLAYER_TWO])   
+                mm_player = Game.PLAYER_ONE if q_player == Game.PLAYER_TWO else Game.PLAYER_TWO                
 
-                    while not game.end:                        
+                if game.turn == mm_player:                        
+                    x, y = game.get_xy(game.calculate_best_play(mm_player, mm_depth, True))
+                    game.place_ring(x, y)                 
 
-                        state = copy.deepcopy(game)
+                while not game.end:                        
 
-                        valid_moves = game.get_valid_moves()
-                        if valid_moves == []:
-                            break
+                    state = copy.deepcopy(game)
 
-                        # Learner
-                        action = self.choose_action(self.Q_TABLE, state, valid_moves, epsilon)                    
-                        x, y = game.get_xy(action)
-                        game.place_ring(x, y)    
+                    valid_moves = game.get_valid_moves()
+                    if valid_moves == []:
+                        break
 
+                    # Learner
+                    action = self.choose_action(self.Q_TABLE, state, epsilon, q_player)                    
+                    x, y = game.get_xy(action)
+                    game.place_ring(x, y)                        
+                
+                    if game.end:    
                         next_state = copy.deepcopy(game)
-                        next_valid_moves = game.get_valid_moves()                        
-
-                        if game.end:
-                            reward = self.calculate_reward(q_player, state, next_state)
-                            self.learn(self.Q_TABLE, state, action, reward, next_state, next_valid_moves) 
-                            break
-                       
-                        # Opponent                        
-                        x, y = game.get_xy(game.calculate_best_play(mm_player, mm_depth, True))
-                        game.place_ring(x, y)    
-
-                        next_state = copy.deepcopy(game)
-                        next_valid_moves = game.get_valid_moves()                     
-
                         reward = self.calculate_reward(q_player, state, next_state)
-                        self.learn(self.Q_TABLE, state, action, reward, next_state, next_valid_moves) 
+                        self.learn(self.Q_TABLE, state, action, reward, next_state, q_player)                                                 
+                        break
+                    
+                    # Opponent                           
+                    use_mm = random.random() < random_play                                  
+                    x, y = game.get_xy(game.calculate_best_play(mm_player, mm_depth, True) if use_mm else random.choice(game.get_valid_moves()))                     
+
+                    game.place_ring(x, y)     
+
+                    next_state = copy.deepcopy(game)
+
+                    reward = self.calculate_reward(q_player, state, next_state)
+                    self.learn(self.Q_TABLE, state, action, reward, next_state, q_player)  
+
+                    if game.end:                        
+                        break     
                         
-                    if game.winner == q_player:
-                        victory_log.write('1,')                       
-                    elif game.winner == mm_player:
-                        victory_log.write('-1,')
-                    else:
-                        victory_log.write('0,')                        
+                victory_log = open(f'{script_dir}/victory.csv', 'a') 
+                if game.winner == q_player:
+                    victory_log.write('1,')                       
+                elif game.winner == mm_player:
+                    victory_log.write('-1,')
+                else:
+                    victory_log.write('0,')                        
+                victory_log.close()
 
-                    if r % 1000 == 0:
-                        self.save_q_table()
-                        print(f"Saved q_tables on round {r}")
+                if r % 1000 == 0:
+                    self.save_q_table()
+                    print(f"Saved q_tables on round {r}")
 
-                    epsilon = max(self.parameters['EPSILON_MIN'], epsilon * self.parameters['EPSILON_DECAY'])
-                except Exception as e:
-                    print(f"Training stopped on round {r}")                          
-                    print(e)                          
+                epsilon = max(self.parameters['EPSILON_MIN'], self.parameters['INITIAL_EPSILON'] - (self.parameters['INITIAL_EPSILON']-self.parameters['EPSILON_MIN']) * (r / rounds))
+            except Exception as e:
+                print(f"Training stopped on round {r}")                          
+                print(e)                          
 
     def save_q_table(self, dir: str = '.'):
         script_dir = Path(__file__).resolve().parent
         with open(f'{script_dir}/{dir}/q_table.csv', 'w') as file:
             for k in self.Q_TABLE.keys():
-                file.write(k + ";")
+                file.write(k + ",")
                 for i in range(len(self.Q_TABLE[k])):
                     v = str(self.Q_TABLE[k][i])
-                    file.write(v + (";" if i < len(self.Q_TABLE[k]) - 1 else ''))
+                    file.write(v + ("," if i < len(self.Q_TABLE[k]) - 1 else ''))
                 file.write('\n')
 
     def load_q_table(self, dir: str = '.'):
@@ -144,7 +162,7 @@ class Learner():
             with open(f'{script_dir}/{dir}/q_table.csv', 'r') as file:
                 lines = file.readlines()            
                 for l in lines:
-                    l = l.strip().split(';')
+                    l = l.strip().split(',')
                     self.Q_TABLE[l[0]] = np.zeros(36)
                     for i in range(36):                    
                         self.Q_TABLE[l[0]][i] = float(l[i+1])    

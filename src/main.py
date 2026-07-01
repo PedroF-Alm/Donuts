@@ -172,7 +172,7 @@ def run_game():
                         position = data                
                         x, y = game.get_xy(position)                                      
                         if game.place_ring(x, y):
-                            print(f"Player {"one" if game.turn == Game.PLAYER_ONE else "two"} places donut: {position}")                        
+                            print(f"Player {'one' if game.turn == Game.PLAYER_ONE else 'two'} places donut: {position}")                        
                             gui_input_queue.put(('UPDATE', (game.grid, game.turn, game.winner, game.end, game.player_rings)))                        
                             if game.end:
                                 print(f"Winner: {game.winner}")   
@@ -203,12 +203,12 @@ def run_game():
 
                 if autonomous_p1 and game.turn == Game.PLAYER_ONE:
                     if p1_learning and not game.end: 
-                        position = learner.choose_action(learner.Q_TABLE, game, game.get_valid_moves(), 0)
+                        position = learner.choose_action(learner.Q_TABLE, game, 0, Game.PLAYER_ONE)
                     else:
                         position = game.calculate_best_play(game.PLAYER_ONE, depth=p1_expertise, use_alpha_beta=p1_alpha_beta)
                 else:
                     if p2_learning and not game.end:                        
-                        position = learner.choose_action(learner.Q_TABLE, game, game.get_valid_moves(), 0)
+                        position = learner.choose_action(learner.Q_TABLE, game, 0, Game.PLAYER_TWO)
                     else:
                         position = game.calculate_best_play(game.PLAYER_TWO, depth=p2_expertise, use_alpha_beta=p2_alpha_beta)
 
@@ -216,7 +216,7 @@ def run_game():
                     x, y = game.get_xy(position)  
 
                     if game.place_ring(x, y):
-                        print(f"Player {"one" if game.turn == Game.PLAYER_ONE else "two"} places donut: {position}")
+                        print(f"Player {'one' if game.turn == Game.PLAYER_ONE else 'two'} places donut: {position}")
                         gui_input_queue.put(('UPDATE', (game.grid, game.turn, game.winner, game.end, game.player_rings)))
                         if game.end:
                             print(f"Winner: {game.winner}")          
