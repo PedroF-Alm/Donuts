@@ -12,3 +12,14 @@ class Slot:
         self.direction = direction if 0 <= direction < 4 else 0       
         self.blocked = False        
         self.marked = False
+
+    def clone(self):
+        s = Slot.__new__(Slot)
+
+        s.owner = -1 if self.ring is None else self.ring.owner
+
+        s.direction = self.direction
+        s.blocked = self.blocked
+        s.marked = self.marked
+
+        return s

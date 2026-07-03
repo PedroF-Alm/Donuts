@@ -164,6 +164,7 @@ class Game:
     def get_lines(self):
         lines = []
 
+
         for i in range(6):
             lines.append(self.grid[i*6 : i*6+6]) 
             lines.append(self.grid[i :: 6])      
@@ -174,7 +175,7 @@ class Game:
         lines.append(self.grid[0:36:7]) 
         lines.append(self.grid[1:30:7]) 
         lines.append(self.grid[6:36:7])   
-
+        
         return lines
 
     def get_fives(self) -> bool:
@@ -317,7 +318,10 @@ class Game:
     def get_valid_moves(self) -> list:    
         if self.end:
             return []  
-        return [i for i in range(36) if not self.grid[i].blocked and self.grid[i].ring is None]
+        if hasattr(self.grid[0], "owner"):
+            return [i for i in range(36) if not self.grid[i].blocked and self.grid[i].owner == -1]
+        else:
+            return [i for i in range(36) if not self.grid[i].blocked and self.grid[i].ring is None]
 
     def place_ring(self, x: int, y: int) -> bool:        
         if not self.end and 0 <= x < 6 and 0 <= y < 6 and self.player_rings[self.turn] > 0:
@@ -452,3 +456,17 @@ class Game:
             _, best_index = self.minimax(depth, player == favorite, favorite)             
 
         return best_index
+    
+    def clone(self):
+        g = Game.__new__(Game)
+
+        g.turn = self.turn
+        g.end = self.end
+        g.winner = self.winner
+
+        g.max_component_player_one = self.max_component_player_one.copy()
+        g.max_component_player_two = self.max_component_player_two.copy()
+
+        g.grid = [slot.clone() for slot in self.grid]
+
+        return g
