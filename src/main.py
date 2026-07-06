@@ -124,6 +124,9 @@ def run_game():
     
     autonomous_p1 = input("Autonomous player one? (y/n): ")[0] == "y"
     autonomous_p2 = input("Autonomous player two? (y/n): ")[0] == "y"
+    
+    p1_learning = False
+    p2_learning = False
 
     if autonomous_p1:
         p1_learning = input("Autonomous player one learns? (y/n): ")[0] == "y"
@@ -146,7 +149,7 @@ def run_game():
     if autonomous_p2 and not p2_learning:
         p2_expertise = int(input("Autonomous player two expertise (Minimax limit): "))
 
-    game = Game(seed=seed, xml_file_name=f'{script_dir}/tree.xml')
+    game = Game(seed=seed, xml_file_name=f'{script_dir}/tree.xml')    
     
     print(f'{script_dir}/tree.xml')
 
