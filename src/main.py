@@ -54,12 +54,12 @@ def run_game():
     using_gui = True
 
     learner = Learner()
-    learner.load_q_table()    
+    learner.load_q_tables()    
 
     if '-train' in sys.argv:
         rounds = int(input("Rounds: "))
         learner.train(rounds)
-        learner.save_q_table()
+        learner.save_q_tables()
 
     if '-test' in sys.argv:
         print('Range of minimax limit: ')        
@@ -98,7 +98,7 @@ def run_game():
                                     params = {Game.PLAYER_ONE: [limit_p1, False], Game.PLAYER_TWO: [limit_p2, True]}
                                     start_time = time.perf_counter()
                                     while not game.end:
-                                        position = game.calculate_best_play(game.turn, depth=params[game.turn][0], use_alpha_beta=params[game.turn][1])
+                                        position = game.calculate_best_play(depth=params[game.turn][0], use_alpha_beta=params[game.turn][1])
                                         x, y = game.get_xy(position)
                                         game.place_ring(x, y)
                                     game.save_tree_xml()
@@ -206,14 +206,14 @@ def run_game():
 
                 if autonomous_p1 and game.turn == Game.PLAYER_ONE:
                     if p1_learning and not game.end: 
-                        position = learner.choose_action(learner.Q_TABLE, game, 0, Game.PLAYER_ONE)
+                        position = learner.choose_action(learner.Q_TABLE_P1, game, 0, Game.PLAYER_ONE)
                     else:
-                        position = game.calculate_best_play(game.PLAYER_ONE, depth=p1_expertise, use_alpha_beta=p1_alpha_beta)
+                        position = game.calculate_best_play(depth=p1_expertise, use_alpha_beta=p1_alpha_beta)
                 else:
                     if p2_learning and not game.end:                        
-                        position = learner.choose_action(learner.Q_TABLE, game, 0, Game.PLAYER_TWO)
+                        position = learner.choose_action(learner.Q_TABLE_P2, game, 0, Game.PLAYER_TWO)
                     else:
-                        position = game.calculate_best_play(game.PLAYER_TWO, depth=p2_expertise, use_alpha_beta=p2_alpha_beta)
+                        position = game.calculate_best_play(depth=p2_expertise, use_alpha_beta=p2_alpha_beta)
 
                 if position != -1:
                     x, y = game.get_xy(position)  

@@ -22,10 +22,10 @@ class Game:
         self.states = []
         self.state_tree = Node(None)
         self.state_tree_reference = self.state_tree
+
+        self.max_component_p1 = []
+        self.max_component_p2 = []
                 
-        self.max_component_player_one = []
-        self.max_component_player_two = []
-        
         for i in range(0, 36):                  
             self.grid.append(Slot(random.randint(0, 3)))
   
@@ -164,7 +164,6 @@ class Game:
     def get_lines(self):
         lines = []
 
-
         for i in range(6):
             lines.append(self.grid[i*6 : i*6+6]) 
             lines.append(self.grid[i :: 6])      
@@ -179,18 +178,24 @@ class Game:
         return lines
 
     def get_fives(self) -> bool:
-        target = [self.turn] * 5
-        result = False
+        p1_row = [Game.PLAYER_ONE] * 5
+        p2_row = [Game.PLAYER_TWO] * 5
+        result = None
 
         lines = self.get_lines()
 
         for i in range(len(lines)):
             owners = self.get_owners(lines[i])                                 
-            if self.is_sublist(target, owners): 
+            if self.is_sublist(p1_row, owners): 
                 for s in lines[i]:
                     if s.ring and s.ring.owner == self.turn:
                         s.marked = True
-                result = True                
+                return Game.PLAYER_ONE
+            if self.is_sublist(p2_row, owners): 
+                for s in lines[i]:
+                    if s.ring and s.ring.owner == self.turn:
+                        s.marked = True
+                return Game.PLAYER_TWO   
         
         return result
     
@@ -216,23 +221,23 @@ class Game:
             if bottom < 36 and grid_owners[bottom] == grid_owners[i]:
                 graph.addEdge(i, bottom)
         
-        self.max_component_player_one = []
-        self.max_component_player_two = []
+        self.max_component_p1 = []
+        self.max_component_p2 = []
 
         for c in graph.getComponents():              
             r = self.grid[c[0]].ring     
             if r is not None:       
-                if r.owner == self.PLAYER_ONE and len(c) > len(self.max_component_player_one):
-                    self.max_component_player_one = c
-                elif r.owner == self.PLAYER_TWO and len(c) > len(self.max_component_player_two):
-                    self.max_component_player_two = c        
+                if r.owner == self.PLAYER_ONE and len(c) > len(self.max_component_p1):
+                    self.max_component_p1 = c
+                elif r.owner == self.PLAYER_TWO and len(c) > len(self.max_component_p2):
+                    self.max_component_p2 = c        
 
-        if len(self.max_component_player_one) == len(self.max_component_player_two):            
+        if len(self.max_component_p1) == len(self.max_component_p2):            
             return None, None
-        elif len(self.max_component_player_one) > len(self.max_component_player_two):
-            max_component = self.max_component_player_one
+        elif len(self.max_component_p1) > len(self.max_component_p2):
+            max_component = self.max_component_p1
         else:
-            max_component = self.max_component_player_two     
+            max_component = self.max_component_p2     
 
         owner = self.grid[max_component[0]].ring.owner
 
@@ -242,8 +247,9 @@ class Game:
         for s in self.grid:
             s.marked = False 
 
-        if (self.get_fives()):
-            self.winner = self.turn            
+        winner = self.get_fives()
+        if winner is not None:
+            self.winner = winner
             self.end = True
             return True        
                 
@@ -271,8 +277,9 @@ class Game:
         child = Node(self.serialize_state()) 
         child.move = self.get_me(x, y)
 
-        child.heuristic_p1 = self.heuristic(Game.PLAYER_ONE)
-        child.heuristic_p2 = self.heuristic(Game.PLAYER_TWO)
+        child.heuristic = self.heuristic()
+
+        child.non_explored = len(self.get_valid_moves())
 
         self.state_tree_reference = self.state_tree_reference.add_child(child)    
         
@@ -280,15 +287,15 @@ class Game:
 
     def save_state(self) -> dict:
         state = {
-            'grid': copy.deepcopy(self.grid), 
-            'player_rings': self.player_rings.copy(), 
-            'turn': self.turn, 
-            'end': self.end, 
-            'winner': self.winner, 
-            'step': self.step,
-            'tree_reference': self.state_tree_reference,       
-            'max_c_p1': self.max_component_player_one.copy(),
-            'max_c_p2': self.max_component_player_two.copy(),
+            'grid'          : copy.deepcopy(self.grid), 
+            'player_rings'  : self.player_rings.copy(), 
+            'turn'          : self.turn, 
+            'end'           : self.end, 
+            'winner'        : self.winner, 
+            'step'          : self.step,
+            'tree_reference': self.state_tree_reference,
+            'max_c_p1'      : self.max_component_p1.copy(),
+            'max_c_p2'      : self.max_component_p2.copy()
         }
 
         self.states.append(state)
@@ -302,9 +309,9 @@ class Game:
             self.turn                     = state['turn']
             self.end                      = state['end']
             self.winner                   = state['winner']
-            self.step                     = state['step']            
-            self.max_component_player_one = state['max_c_p1']
-            self.max_component_player_two = state['max_c_p2']                                     
+            self.step                     = state['step']  
+            self.max_component_p1         = state['max_c_p1']
+            self.max_component_p2         = state['max_c_p2'] 
 
             self.state_tree_reference = state['tree_reference']   
             
@@ -339,13 +346,9 @@ class Game:
         if self.xml_file_name is not None:
             self.state_tree.save_to_xml(self.xml_file_name, active_node=self.state_tree_reference)
 
-    def minimax(self, depth: int = -1, maximizingPlayer: bool = True, favorite = PLAYER_ONE) -> int:        
-        if depth == 0 or self.end:
-
-            if self.end:
-                return 1000 if self.winner == favorite else -1000, -1            
-                    
-            return self.heuristic(favorite), -1         
+    def minimax(self, depth: int = -1, maximizingPlayer: bool = True) -> tuple[int, int]:        
+        if depth == 0 or self.end:    
+            return self.heuristic(), -1         
         
         valid_moves = self.get_valid_moves()
 
@@ -356,9 +359,9 @@ class Game:
             
             x, y = self.get_xy(move)
 
-            if self.place_ring(x, y):            
+            if self.place_ring(x, y):
 
-                score, _ = self.minimax(depth - 1, not maximizingPlayer, favorite)
+                score, _ = self.minimax(depth - 1, not maximizingPlayer)
 
                 self.last_state()
 
@@ -373,13 +376,9 @@ class Game:
                         
         return best_score, best_move
     
-    def minimax_alpha_beta(self, depth: int = -1, alpha: float = -float('inf'), beta: float = float('inf'), maximizingPlayer: bool = True, favorite = PLAYER_ONE) -> int:        
-        if depth == 0 or self.end:
-
-            if self.end:
-                return 1000 if self.winner == favorite else -1000, -1                       
-            
-            return self.heuristic(favorite), -1  
+    def minimax_alpha_beta(self, depth: int = -1, alpha: float = -float('inf'), beta: float = float('inf'), maximizingPlayer: bool = True) -> tuple[int, int]:        
+        if depth == 0 or self.end:                      
+            return self.heuristic(), -1  
         
         valid_moves = self.get_valid_moves()
 
@@ -390,8 +389,8 @@ class Game:
             x, y = self.get_xy(move)
 
             if self.place_ring(x, y):
-                
-                score, _ = self.minimax_alpha_beta(depth - 1, alpha, beta, not maximizingPlayer, favorite)
+
+                score, _ = self.minimax_alpha_beta(depth - 1, alpha, beta, not maximizingPlayer)
 
                 self.last_state()
 
@@ -421,39 +420,43 @@ class Game:
         for o in owners:
             if o == player:
                 run += 1
-            else:
-                if run:
-                    score += 2 ** run
-                run = 0
+            else:                
+                score += 3 ** (run - 1)
+                run = 0                
 
         if run:
-            score += 2 ** run
+            score += 3 ** (run - 1)
 
-        return score
+        return int(score)
 
-    def heuristic(self, favorite) -> int:
-        opponent = Game.PLAYER_TWO if favorite == Game.PLAYER_ONE else Game.PLAYER_ONE
+    def heuristic(self) -> int:       
+        if self.end:
+            if self.winner == Game.PLAYER_ONE:
+                return 10000
+            elif self.winner == Game.PLAYER_TWO:
+                return -10000
+            else:
+                return 0        
 
-        h = (len(self.max_component_player_one) - len(self.max_component_player_two)) * 3
-        if favorite == Game.PLAYER_TWO:
-            h = -h
+        h = 0
 
         lines = self.get_lines()
-
         for l in lines:
-            h += self.line_score(favorite, self.get_owners(l))
-            h -= self.line_score(opponent, self.get_owners(l))
+            owners = self.get_owners(l)
+            h += self.line_score(Game.PLAYER_ONE, owners)
 
         return h 
 
-    def calculate_best_play(self, favorite, depth: int = 1, use_alpha_beta: bool = False) -> int:  
+    def calculate_best_play(self, depth: int = 1, use_alpha_beta: bool = False) -> int:  
         player = self.turn
+        is_player_one = player == Game.PLAYER_ONE
+
         best_index = -1
 
         if use_alpha_beta:
-            _, best_index = self.minimax_alpha_beta(depth, maximizingPlayer=player == favorite, favorite=favorite) 
+            _, best_index = self.minimax_alpha_beta(depth, maximizingPlayer = is_player_one) 
         else:
-            _, best_index = self.minimax(depth, player == favorite, favorite)             
+            _, best_index = self.minimax(depth, maximizingPlayer = is_player_one)             
 
         return best_index
     
@@ -463,9 +466,9 @@ class Game:
         g.turn = self.turn
         g.end = self.end
         g.winner = self.winner
-
-        g.max_component_player_one = self.max_component_player_one.copy()
-        g.max_component_player_two = self.max_component_player_two.copy()
+        
+        g.max_component_p1 = self.max_component_p1.copy()
+        g.max_component_p2 = self.max_component_p2.copy()
 
         g.grid = [slot.clone() for slot in self.grid]
 

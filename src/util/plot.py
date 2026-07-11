@@ -13,24 +13,46 @@ def build_graph_from_xml(xml_file):
     root = tree.getroot()
     g = Graph(directed=True)
     labels = []
-    mapping = {'-1': "⬜", '0': "🟨", '1': "🟫", '2': "🟧"}
-    def add_node(element, parent_index=None):
+    mapping = {'-1': "⬜", '0': "🟨", '1': "🟫", '2': "🟧"}    
+    
+    def add_node(element, parent_index=None):        
+        # 1. Properly create the primary State Node first
         current_index = g.vcount()
         g.add_vertex()
+        
         data = element.get('data')    
-        heuristic_p1 = element.get('heuristic_p1') 
-        heuristic_p2 = element.get('heuristic_p2') 
+        heuristic = element.get('heuristic') 
         move = int(element.get("move"))
         active = element.get('active')        
-        if data != 'None':
+        
+        if data != 'None' and data is not None:
             data = data.split(':')  
             grid = ''.join(f"{mapping[v] if i != move else mapping['2']}{'<br>' if (i + 1) % 6 == 0 else ''}" for i, v in enumerate(data[0].removeprefix('[').removesuffix(']').split(', ')))                        
-            data = f"Grid: <br>{grid}<br>Player Rings: {data[1]}<br>Turn: {data[2]}<br>End: {data[3]}<br>Winner: {data[4]}<br>Steps: {data[5]}<br>Active: {False if active is None else True}<br>Heuristic: [{heuristic_p1}, {heuristic_p2}]"
+            data = f"Grid: <br>{grid}<br>Player Rings: {data[1]}<br>Turn: {data[2]}<br>End: {data[3]}<br>Winner: {data[4]}<br>Steps: {data[5]}<br>Active: {False if active is None else True}<br>Heuristic: {heuristic}"
+        
+        # Add the State Node's label immediately so current_index matches labels length
         labels.append(data)
+        
+        # Connect this node to its actual tree parent
         if parent_index is not None:
             g.add_edge(parent_index, current_index)
+            
+        # 2. Add the Sibling Node safely *after* the State Node is securely indexed
+        non_explored_attr = element.get('non_explored')
+        non_explored = int(non_explored_attr) if non_explored_attr is not None else 0
+        
+        if non_explored > 0:
+            sibling_index = g.vcount()
+            g.add_vertex()
+            labels.append(f"Possible Moves: {non_explored}")
+            
+            # Point from the State Node to its Side-Sibling Node
+            g.add_edge(current_index, sibling_index)
+
+        # 3. Recursively continue down the tree branch
         for child in element:
             add_node(child, current_index)
+
     add_node(root)
     return g, labels
 
@@ -107,9 +129,10 @@ def start_plot(xml_file_name, interval):
                         node_colors.append('#16c60c')                    
                     elif 'Turn: 0' in label:
                         node_colors.append('#fff100')
-                    else:
+                    elif 'Turn: 1' in label:
                         node_colors.append('#8e562e')   
-
+                    else:
+                        node_colors.append("#6ea7f1")
                 if 'Active: True' in label:
                     border_widths[i] = 3 
                     border_colors[i] = 'black'

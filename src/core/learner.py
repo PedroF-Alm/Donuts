@@ -7,7 +7,8 @@ import csv
 class Learner():
 
     def __init__(self, parameters: dict = {}):
-        self.Q_TABLE = {}        
+        self.Q_TABLE_P1 = {}
+        self.Q_TABLE_P2 = {}
         self.parameters = {
             'SEED': 1,
             'LEARNING_RATE':    0.1,        
@@ -29,8 +30,8 @@ class Learner():
         else:
             owners = state.get_owners(state.grid)            
 
-        my_max_comp = len(state.max_component_player_one if q_player == Game.PLAYER_ONE else state.max_component_player_two)
-        opp_max_comp = len(state.max_component_player_two if q_player == Game.PLAYER_ONE else state.max_component_player_one)
+        my_max_comp = len(state.max_component_p1 if q_player == Game.PLAYER_ONE else state.max_component_p2)
+        opp_max_comp = len(state.max_component_p2 if q_player == Game.PLAYER_ONE else state.max_component_p1)
             
         comp_diff = "W" if my_max_comp > opp_max_comp else ("L" if my_max_comp < opp_max_comp else "E")
             
@@ -91,26 +92,22 @@ class Learner():
         for r in range(rounds):                        
             self.game = Game(seed=self.parameters['SEED'])
             game = self.game                    
-            random.seed(r)                 
+            random.seed(r)           
 
-            q_player = Game.PLAYER_ONE if random.randint(0,1) else Game.PLAYER_TWO
-            mm_player = Game.PLAYER_ONE if q_player == game.PLAYER_TWO else Game.PLAYER_ONE
+            agent_player = Game.PLAYER_ONE 
+            opponent_player = Game.PLAYER_TWO
+                        
+            opponent_action = None
+            after_opponent_state = None
 
-            if q_player == Game.PLAYER_TWO:
-                v_moves = game.get_valid_moves()
-                if v_moves:
-                    x, y = game.get_xy(game.calculate_best_play(mm_player, 2, True)) 
-                    # x, y = game.get_xy(random.choice(v_moves)) 
-                    game.place_ring(x, y)                  
-            
             while not game.end:                        
-                state = game.clone()
+                before_agent_state = game.clone()
                 valid_moves = game.get_valid_moves()
                 if not valid_moves:
                     break
 
                 # 1. Agent moves
-                action = self.choose_action(self.Q_TABLE, state, epsilon, q_player)                    
+                action = self.choose_action(self.Q_TABLE_P1, before_agent_state, epsilon, agent_player)                    
                 if action is None:
                     break
                 x, y = game.get_xy(action)
@@ -118,29 +115,38 @@ class Learner():
                 
                 # Capture board state immediately after agent's specific move
                 after_agent_state = game.clone()
+
+                if opponent_action is not None:
+                    reward = self.calculate_reward(opponent_player, after_opponent_state, after_agent_state)
+                    self.learn(self.Q_TABLE_P2, after_opponent_state, opponent_action, reward, after_agent_state, opponent_player)
                 
                 if game.end:    
-                    reward = self.calculate_reward(q_player, state, after_agent_state)
-                    self.learn(self.Q_TABLE, state, action, reward, after_agent_state, q_player)                                                                        
+                    reward = self.calculate_reward(agent_player, before_agent_state, after_agent_state)
+                    self.learn(self.Q_TABLE_P1, before_agent_state, action, reward, after_agent_state, agent_player)                                                                        
                     break
                         
                 # 2. Opponent moves
-                opp_moves = game.get_valid_moves()
-                if opp_moves:
-                    # x, y = game.get_xy(random.choice(opp_moves)) 
-                    x, y = game.get_xy(game.calculate_best_play(mm_player, 2, True)) 
-                    game.place_ring(x, y) 
+                opponent_action = self.choose_action(self.Q_TABLE_P2, after_agent_state, epsilon, opponent_player)                    
+                if opponent_action is None:
+                    break
+                x, y = game.get_xy(opponent_action)
+                game.place_ring(x, y) 
 
                 after_opponent_state = game.clone()
 
                 # 3. Evaluate the step based strictly on the player's performance impact
                 # and pass the opponent's result as the next true state representation
-                reward = self.calculate_reward(q_player, state, after_agent_state)
-                self.learn(self.Q_TABLE, state, action, reward, after_opponent_state, q_player)  
+                reward = self.calculate_reward(agent_player, before_agent_state, after_opponent_state)
+                self.learn(self.Q_TABLE_P1, before_agent_state, action, reward, after_opponent_state, agent_player)  
+
+                if game.end:    
+                    reward = self.calculate_reward(opponent_player, after_agent_state, after_opponent_state)
+                    self.learn(self.Q_TABLE_P2, after_agent_state, opponent_action, reward, after_opponent_state, opponent_player)                                                                        
+                    break
 
             # Log step metrics safely
             with open(f"{script_dir}/victory.csv", "a") as victory_log:               
-                if game.winner == q_player:
+                if game.winner == agent_player:
                     victory_log.write('1,') 
                 elif game.winner is None:  
                     victory_log.write('0,')                
@@ -148,35 +154,44 @@ class Learner():
                     victory_log.write('-1,')                        
 
             if r % 1000 == 0 and r > 0:
-                self.save_q_table()
-                print(f"Saved q_tables on round {r}. Table row count: {len(self.Q_TABLE)}")
+                self.save_q_tables()
+                print(f"Saved q_tables on round {r}. Tables row count: {len(self.Q_TABLE_P1)}, {len(self.Q_TABLE_P2)}")
 
             epsilon = max(self.parameters['EPSILON_MIN'], self.parameters['INITIAL_EPSILON'] - (self.parameters['INITIAL_EPSILON']-self.parameters['EPSILON_MIN']) * (r / rounds))         
 
-    def save_q_table(self, dir: str = '.'):
+    def save_q_tables(self, dir: str = '.'):
         script_dir = Path(__file__).resolve().parent        
-        with open(f'{script_dir}/{dir}/q_table.csv', "w", newline="") as f:
+        with open(f'{script_dir}/{dir}/q_table_p1.csv', "w", newline="") as f:
             writer = csv.writer(f)
-            for key, values in self.Q_TABLE.items():
+            for key, values in self.Q_TABLE_P1.items():
+                writer.writerow([key] + values.tolist())
+        with open(f'{script_dir}/{dir}/q_table_p2.csv', "w", newline="") as f:
+            writer = csv.writer(f)
+            for key, values in self.Q_TABLE_P2.items():
                 writer.writerow([key] + values.tolist())
 
-    def load_q_table(self, dir: str = '.'):
+    def load_q_tables(self, dir: str = '.'):
         script_dir = Path(__file__).resolve().parent
         try:                
-            with open(f'{script_dir}/{dir}/q_table.csv') as f:
+            with open(f'{script_dir}/{dir}/q_table_p1.csv') as f:
                 reader = csv.reader(f)
                 for row in reader:
                     key = row[0]
-                    self.Q_TABLE[key] = np.array(row[1:], dtype=np.float32)
+                    self.Q_TABLE_P1[key] = np.array(row[1:], dtype=np.float32)
+            with open(f'{script_dir}/{dir}/q_table_p2.csv') as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    key = row[0]
+                    self.Q_TABLE_P2[key] = np.array(row[1:], dtype=np.float32)
         except FileNotFoundError:
-            self.save_q_table()            
+            self.save_q_tables()            
 
     def calculate_reward(self, favorite: int, state: Game, next_state: Game) -> float:
         reward = 0
         if favorite == Game.PLAYER_ONE:
-            reward = (len(next_state.max_component_player_one) - len(state.max_component_player_one)) * 3
+            reward = (len(next_state.max_component_p1) - len(state.max_component_p1)) * 3
         elif favorite == Game.PLAYER_TWO:
-            reward = (len(next_state.max_component_player_two) - len(state.max_component_player_two)) * 3
+            reward = (len(next_state.max_component_p2) - len(state.max_component_p2)) * 3
 
         state_lines = state.get_lines()
         next_state_lines = next_state.get_lines()        
