@@ -23,6 +23,8 @@ class Game:
         self.state_tree = Node(None)
         self.state_tree_reference = self.state_tree
 
+        self.last_play = None
+
         self.max_component_p1 = []
         self.max_component_p2 = []
                 
@@ -43,6 +45,41 @@ class Game:
         if 0 <= x < 6 and 0 <= y < 6:
             return y * 6 + x
         return None
+    
+    def get_interceptors(self, x0, y0):
+        # Horizontal
+        horizontal = [self.get_me(x, y0) for x in range(6)]
+
+        # Vertical
+        vertical = [self.get_me(x0, y) for y in range(6)]
+
+        # First Diagonal
+        first_diagonal = []
+
+        x, y = x0, y0
+        while x > 0 and y > 0:
+            x -= 1
+            y -= 1
+
+        while x < 6 and y < 6:
+            first_diagonal.append(self.get_me(x, y))
+            x += 1
+            y += 1
+
+        # Second Diagonal
+        second_diagonal = []
+
+        x, y = x0, y0
+        while x > 0 and y < 5:
+            x -= 1
+            y += 1
+
+        while x < 6 and y >= 0:
+            second_diagonal.append(self.get_me(x, y))
+            x += 1
+            y -= 1
+
+        return horizontal, vertical, first_diagonal, second_diagonal
 
     def change_slots(self, x0: int, y0: int, direction: int):
         for i in range(0, 36):        
@@ -266,6 +303,7 @@ class Game:
 
     def evaluate(self, x: int, y: int) -> None:            
         me = self.get_me(x, y)
+        self.last_play = me
         self.grid[me].ring = Ring(self.turn)            
         self.grid[me].blocked = True  
         self.player_rings[self.turn] -= 1
@@ -295,7 +333,8 @@ class Game:
             'step'          : self.step,
             'tree_reference': self.state_tree_reference,
             'max_c_p1'      : self.max_component_p1.copy(),
-            'max_c_p2'      : self.max_component_p2.copy()
+            'max_c_p2'      : self.max_component_p2.copy(),
+            'last_play'     : self.last_play
         }
 
         self.states.append(state)
@@ -312,6 +351,7 @@ class Game:
             self.step                     = state['step']  
             self.max_component_p1         = state['max_c_p1']
             self.max_component_p2         = state['max_c_p2'] 
+            self.last_play                = state['last_play']
 
             self.state_tree_reference = state['tree_reference']   
             
@@ -337,7 +377,7 @@ class Game:
 
             if slot_2_place.ring == None and not slot_2_place.blocked:
                 self.save_state()
-                self.evaluate(x, y) 
+                self.evaluate(x, y)                 
                 return True
             
         return False
@@ -466,6 +506,9 @@ class Game:
         g.turn = self.turn
         g.end = self.end
         g.winner = self.winner
+        g.player_rings = self.player_rings.copy()
+        g.step = self.step
+        g.last_play = self.last_play
         
         g.max_component_p1 = self.max_component_p1.copy()
         g.max_component_p2 = self.max_component_p2.copy()
