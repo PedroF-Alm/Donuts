@@ -30,21 +30,11 @@ class Learner():
             interceptors = list(state.get_interceptors(x, y))            
 
             if hasattr(state.grid[0], 'owner'):
-                lines_with_free_slots = 0             
-                main_line = 0
                 for i in range(len(interceptors)):                    
                     interceptors[i] = ''.join(['3' if state.grid[j].owner == -1 and state.grid[j].blocked else (str(1 if state.grid[j].owner == q_player else 0) if state.grid[j].owner != -1 else '2') for j in interceptors[i]])
-                    if '2' in interceptors[i]:
-                        lines_with_free_slots += 1
-                        main_line = i
             else:                
-                lines_with_free_slots = 0
-                main_line = 0
                 for i in range(len(interceptors)):                    
                     interceptors[i] = ''.join(['3' if state.get_owner(state.grid[j]) == -1 and state.grid[j].blocked else (str(1 if state.get_owner(state.grid[j]) == q_player else 0) if state.get_owner(state.grid[j]) != -1 else '2') for j in interceptors[i]])
-                    if '2' in interceptors[i]:
-                        lines_with_free_slots += 1                        
-                        main_line = i
             
             state.get_xy(state.last_play)
 
@@ -59,16 +49,18 @@ class Learner():
                 sy = 1
 
             sector = sx * 2 + sy
+            
+            H = interceptors[0]
+            V = interceptors[1]
+            F = interceptors[2]
+            S = interceptors[3]
 
-            if lines_with_free_slots == 1:
-                key = f"{sector}:{({0: 'H', 1: 'V', 2: 'F', 3: 'S'}[main_line])}({min(interceptors[main_line], interceptors[main_line][::-1])})" 
-            else:
-                if hasattr(state.grid[0], 'owner'):
-                    grid_owners = [s.owner for s in state.grid]
-                else:
-                    grid_owners = state.get_owners(state.grid)
-                key = ''.join(['3' if grid_owners[i] == -1 and state.grid[i].blocked else (str(1 if grid_owners[i] == q_player else 0) if grid_owners[i] != -1 else '2') for i in range(36)])
-                key = f"{sector}:G({key})"
+            H = H if '2' in H else ''
+            V = V if '2' in V else ''
+            F = F if '2' in F else ''
+            S = S if '2' in S else ''
+
+            key = f"{sector}:H({H}):V({V}):F({F}):S({S}))" 
            
         if key is None:
             key = 'None:G(222222222222222222222222222222222222)'            
@@ -191,6 +183,8 @@ class Learner():
                     victory_log.write(f'{r},0\n')
                 else:
                     victory_log.write(f'{r},-1\n')
+            with open(f"{script_dir}/evolution.csv", "a") as evolution_log:
+                evolution_log.write(f'{r},{len(self.Q_TABLE)}\n')
 
             if r % 1000 == 0 and r > 0:
                 self.save_q_table()
