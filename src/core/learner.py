@@ -24,25 +24,40 @@ class Learner():
         self.game: Game = None
 
     def get_q_values(self, q_table: dict, state: Game, q_player: int):       
+        key = None
         if state.last_play is not None: 
             x, y = state.get_xy(state.last_play)
             interceptors = list(state.get_interceptors(x, y))            
 
-            if hasattr(state.grid[0], 'owner'):                
+            if hasattr(state.grid[0], 'owner'):
+                lines_with_free_slots = 0             
+                main_line = 0
                 for i in range(len(interceptors)):                    
                     interceptors[i] = ''.join(['3' if state.grid[j].owner == -1 and state.grid[j].blocked else (str(1 if state.grid[j].owner == q_player else 0) if state.grid[j].owner != -1 else '2') for j in interceptors[i]])
+                    if '2' in interceptors[i]:
+                        lines_with_free_slots += 1
+                        main_line = i
             else:                
+                lines_with_free_slots = 0
+                main_line = 0
                 for i in range(len(interceptors)):                    
                     interceptors[i] = ''.join(['3' if state.get_owner(state.grid[j]) == -1 and state.grid[j].blocked else (str(1 if state.get_owner(state.grid[j]) == q_player else 0) if state.get_owner(state.grid[j]) != -1 else '2') for j in interceptors[i]])
-        else:
-            interceptors = "SSSS"
+                    if '2' in interceptors[i]:
+                        lines_with_free_slots += 1                        
+                        main_line = i
 
-        H = min(interceptors[0], interceptors[0][::-1])
-        V = min(interceptors[1], interceptors[1][::-1])
-        F = min(interceptors[2], interceptors[2][::-1])
-        S = min(interceptors[3], interceptors[3][::-1])
-
-        key = f'H({H}):V({V}):F({F}):S({S})'
+            if lines_with_free_slots == 1:
+                key = f"{state.last_play}:{({0: 'H', 1: 'V', 2: 'F', 3: 'S'}[main_line])}({min(interceptors[main_line], interceptors[main_line][::-1])})" 
+            else:
+                if hasattr(state.grid[0], 'owner'):
+                    grid_owners = [s.owner for s in state.grid]
+                else:
+                    grid_owners = state.get_owners(state.grid)
+                key = ''.join(['3' if grid_owners[i] == -1 and state.grid[i].blocked else (str(1 if grid_owners[i] == q_player else 0) if grid_owners[i] != -1 else '2') for i in range(36)])
+                key = f"{state.last_play}:G({key})"
+           
+        if key is None:
+            key = 'None:G(222222222222222222222222222222222222)'            
 
         if key not in q_table:
             q_table[key] = np.zeros(36, dtype=np.float32)
