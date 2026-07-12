@@ -107,7 +107,7 @@ class Learner():
             
             prob = random.uniform(0, 1)
 
-            if prob < 0.50:
+            if prob < 0.80:
                 opponent = 0
             elif prob < 0.95:
                 opponent = 1
