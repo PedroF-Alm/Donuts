@@ -109,7 +109,7 @@ class Learner():
 
             if prob < 0.50:
                 opponent = 0
-            elif prob < 0.75:
+            elif prob < 0.95:
                 opponent = 1
             elif prob < 1:
                 opponent = 2
@@ -165,18 +165,18 @@ class Learner():
             # Log step metrics safely
             with open(f"{script_dir}/victory{opponent}.csv", "a") as victory_log:               
                 if game.winner == agent_player:
-                    victory_log.write('1,') 
+                    victory_log.write(f'{r},1\n') 
                 elif game.winner is None:  
-                    victory_log.write('0,')                
+                    victory_log.write(f'{r},0\n')                
                 else:
-                    victory_log.write('-1,')   
+                    victory_log.write(f'{r},-1\n')   
             with open(f"{script_dir}/victory.csv", "a") as victory_log:               
                 if game.winner == agent_player:
-                    victory_log.write('1,') 
+                    victory_log.write(f'{r},1\n')
                 elif game.winner is None:  
-                    victory_log.write('0,')                
+                    victory_log.write(f'{r},0\n')
                 else:
-                    victory_log.write('-1,')                       
+                    victory_log.write(f'{r},-1\n')
 
             if r % 1000 == 0 and r > 0:
                 self.save_q_table()
