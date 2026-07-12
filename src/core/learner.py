@@ -45,16 +45,30 @@ class Learner():
                     if '2' in interceptors[i]:
                         lines_with_free_slots += 1                        
                         main_line = i
+            
+            state.get_xy(state.last_play)
+
+            if x <= 2:
+                sx = 0
+            else:
+                sx = 1
+
+            if y <= 2:
+                sy = 0
+            else:
+                sy = 1
+
+            sector = sx * 2 + sy
 
             if lines_with_free_slots == 1:
-                key = f"{state.last_play}:{({0: 'H', 1: 'V', 2: 'F', 3: 'S'}[main_line])}({min(interceptors[main_line], interceptors[main_line][::-1])})" 
+                key = f"{sector}:{({0: 'H', 1: 'V', 2: 'F', 3: 'S'}[main_line])}({min(interceptors[main_line], interceptors[main_line][::-1])})" 
             else:
                 if hasattr(state.grid[0], 'owner'):
                     grid_owners = [s.owner for s in state.grid]
                 else:
                     grid_owners = state.get_owners(state.grid)
                 key = ''.join(['3' if grid_owners[i] == -1 and state.grid[i].blocked else (str(1 if grid_owners[i] == q_player else 0) if grid_owners[i] != -1 else '2') for i in range(36)])
-                key = f"{state.last_play}:G({key})"
+                key = f"{sector}:G({key})"
            
         if key is None:
             key = 'None:G(222222222222222222222222222222222222)'            
