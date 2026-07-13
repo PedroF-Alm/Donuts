@@ -24,7 +24,7 @@ def start_gui(grid, gui_input_queue, gui_output_queue):
 
     pygame.mixer.init()
     pygame.mixer.music.load(f'{script_dir}/../../assets/sounds/songs/music.ogg')
-    # pygame.mixer.music.play(-1)
+    pygame.mixer.music.play(-1)
 
     roundstart_sfx = pygame.mixer.Sound(f'{script_dir}/../../assets/sounds/sfx/roundstart.ogg')
 
