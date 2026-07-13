@@ -29,9 +29,7 @@ def build_graph_from_xml(xml_file):
             data_parts = data.split(':')  
             grid = ''.join(f"{mapping[v] if i != move else mapping['2']}{'<br>' if (i + 1) % 6 == 0 else ''}" for i, v in enumerate(data_parts[0].removeprefix('[').removesuffix(']').split(', ')))                
             data_str = f"Grid: <br>{grid}<br>Player Rings: {data_parts[1]}<br>Turn: {data_parts[2]}<br>End: {data_parts[3]}<br>Winner: {data_parts[4]}<br>Steps: {data_parts[5]}<br>Active: {active == 'True'}<br>Heuristic: {heuristic}"
-        else:
-            data_str = f"Node {current_index} (No Data)<br>Active: {active == 'True'}"
-        
+
         labels.append(data_str)
         
         if parent_index is not None:
