@@ -10,7 +10,7 @@ class Node():
         self.node_index = {}    
         self.heuristic = -float('inf')        
         self.move = -1           
-        self.non_explored = 36
+        self.possible_moves = 36
 
     def load_from_xml(self, xml_file_name: str) -> None:
         try:
@@ -27,7 +27,7 @@ class Node():
                     new_node = Node(data)                    
                     new_node.heuristic = int(elem.get('heuristic'))                    
                     new_node.move = int(elem.get('move'))
-                    new_node.non_explored = int(elem.get('non_explored'))
+                    new_node.possible_moves = int(elem.get('possible_moves'))
                     stack[-1].add_child(new_node)
                     stack.append(new_node)
                     
@@ -50,7 +50,6 @@ class Node():
             return known           
         
         child.parent = self
-        self.non_explored -= 1
         self.children.append(child)
         root.node_index[child.data] = child
 
@@ -66,7 +65,7 @@ class Node():
         element = ET.Element("node", data=str(self.data))
         element.set('heuristic', str(self.heuristic))        
         element.set('move', str(self.move))
-        element.set('non_explored', str(self.non_explored))
+        element.set('possible_moves', str(self.possible_moves))
         
         if self == active_node:
             element.set('active', 'True')

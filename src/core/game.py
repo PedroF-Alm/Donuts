@@ -24,6 +24,7 @@ class Game:
         self.state_tree_reference = self.state_tree
 
         self.last_play = None
+        self.donuts_taken = None
 
         self.max_component_p1 = []
         self.max_component_p2 = []
@@ -146,7 +147,9 @@ class Game:
 
         neighbors = self.get_neighbors(x, y)
 
-        myself = self.grid[self.get_me(x, y)].ring        
+        myself = self.grid[self.get_me(x, y)].ring    
+
+        self.donuts_taken = None    
                         
         for directed_neighbors in neighbors:                                        
             neighborhood_clusters = []
@@ -183,7 +186,9 @@ class Game:
                     continue
                 
                 edges[0].owner = self.turn
-                edges[1].owner = self.turn                
+                edges[1].owner = self.turn    
+
+                self.donuts_taken = self.turn
     
     def is_sublist(self, sub: list, main: list):
         n = len(sub)
@@ -317,7 +322,7 @@ class Game:
 
         child.heuristic = self.heuristic()
 
-        child.non_explored = len(self.get_valid_moves())
+        child.possible_moves = len(self.get_valid_moves())
 
         self.state_tree_reference = self.state_tree_reference.add_child(child)    
         
@@ -334,7 +339,8 @@ class Game:
             'tree_reference': self.state_tree_reference,
             'max_c_p1'      : self.max_component_p1.copy(),
             'max_c_p2'      : self.max_component_p2.copy(),
-            'last_play'     : self.last_play
+            'last_play'     : self.last_play,
+            'donuts_taken'  : self.donuts_taken
         }
 
         self.states.append(state)
@@ -352,6 +358,7 @@ class Game:
             self.max_component_p1         = state['max_c_p1']
             self.max_component_p2         = state['max_c_p2'] 
             self.last_play                = state['last_play']
+            self.donuts_taken             = state['donuts_taken']
 
             self.state_tree_reference = state['tree_reference']   
             
@@ -477,6 +484,15 @@ class Game:
                 return -10000
             else:
                 return 0        
+            
+        # grid_owners = self.get_owners(self.grid) 
+        # h = grid_owners.count(Game.PLAYER_ONE) - grid_owners.count(Game.PLAYER_TWO)
+        # h += len(self.max_component_p1)
+
+        # if self.donuts_taken == Game.PLAYER_ONE:
+        #     h += 5
+        # elif self.donuts_taken == Game.PLAYER_TWO:
+        #     h -= 10
 
         h = 0
 
@@ -509,6 +525,7 @@ class Game:
         g.player_rings = self.player_rings.copy()
         g.step = self.step
         g.last_play = self.last_play
+        g.donuts_taken = self.donuts_taken
         
         g.max_component_p1 = self.max_component_p1.copy()
         g.max_component_p2 = self.max_component_p2.copy()
